@@ -16,6 +16,7 @@ const CORE = [
   "./js/demo.js",
   "./js/export.js",
   "./js/importer.js",
+  "./js/bulletin-parse.js",
   "./js/journee.js",
   "./js/letters.js",
   "./js/util.js",

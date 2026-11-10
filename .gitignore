@@ -3,3 +3,4 @@ node_modules/
 *.log
 .lighthouseci/
 coverage/
+tests/fixtures/bulletin-photo.png

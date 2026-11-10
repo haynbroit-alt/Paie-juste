@@ -4,3 +4,4 @@ captures/
 coverage/
 package-lock.json
 regles.md
+tests/fixtures/bulletin.html

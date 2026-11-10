@@ -18,6 +18,7 @@ import {
 import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
 import { parseContrat } from "../js/contrat-parse.js";
+import { parseBulletin } from "../js/bulletin-parse.js";
 import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
 import { parisLocalToIso } from "../js/util.js";
@@ -460,6 +461,41 @@ console.log("=== 23. Mes journées et ma semaine ===");
   t(joursDeSemaine("2026-10-26")[6] === "2026-11-01", "semaine à cheval sur deux mois");
   const rec = joursRecents("2026-03-01", 3);
   t(rec.join() === "2026-03-01,2026-02-28,2026-02-27", "jours récents : passage de mois");
+}
+
+console.log("=== 24. Lecture d'un bulletin de paie ===");
+{
+  const texte = [
+    "BULLETIN DE PAIE",
+    "Période du 01/10/2026 au 31/10/2026",
+    "Salaire de base 151,67 12,0200 1 823,07",
+    "Heures supplémentaires 25 % 17,33 15,0250 260,38",
+    "Heures supplémentaires 50 % 4,00 18,0300 72,12",
+    "Prime de salissure 50,00",
+    "Indemnité de fin de mission 220,56",
+    "Indemnité compensatrice de congés payés 242,61",
+    "SALAIRE BRUT 2 668,74",
+    "Sécurité sociale maladie 2 668,74 0,00",
+    "CSG déductible 2 622,04 6,80 178,30",
+    "Indemnité de panier 10 9,50 95,00",
+    "Indemnité de trajet 10 4,20 42,00",
+    "NET A PAYER 2 214,55",
+    "Cumul brut 12 000,00",
+  ].join("\n");
+  const { champs: c, periode } = parseBulletin(texte);
+  t(periode === "2026-10", "période lue : octobre 2026");
+  t(c.heures?.value === 151.67, "heures payées : 151,67");
+  t(c.base?.value === 1823.07, "salaire de base : 1 823,07 €");
+  t(c.hs?.value === 332.5, "heures sup additionnées (25 % + 50 %) : 332,50 €");
+  t(c.primes?.value === 50, "prime : 50 €");
+  t(c.fin?.value === 220.56, "IFM : 220,56 €");
+  t(c.iccp?.value === 242.61, "ICCP : 242,61 €");
+  t(c.frais?.value === 137, "panier + trajet : 137 €");
+  t(c.brut?.value === 2668.74 && c.net?.value === 2214.55, "brut et net lus pour vérification");
+  t(!("csg" in c) && c.brut.value !== 12000, "cotisations et cumuls ignorés");
+  t(c.base.extrait.includes("Salaire de base"), "chaque montant garde sa ligne d'origine");
+  t(Object.keys(parseBulletin("").champs).length === 0, "texte vide : rien proposé");
+  t(parseBulletin("Salaire de base 151.67 12.02 1823.07").champs.base?.value === 1823.07, "points décimaux acceptés");
 }
 
 runRules(t, eq);

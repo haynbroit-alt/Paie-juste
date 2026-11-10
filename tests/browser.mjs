@@ -312,6 +312,34 @@ console.log("=== Import de contrat (local) ===");
   await p.close();
 }
 
+console.log("=== Photo du bulletin de paie (OCR local) ===");
+{
+  const gen = await newPage();
+  await gen.setViewport({ width: 1000, height: 640 });
+  await gen.goto("file://" + FIX + "/bulletin.html");
+  await gen.screenshot({ path: FIX + "/bulletin-photo.png" });
+  await gen.close();
+  const p = await newPage();
+  await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(600);
+  const input = await p.$("#bi-file");
+  t(!!input, "Ma paie : bouton « Photo ou PDF de ma fiche de paie »");
+  const t0 = Date.now();
+  await input.uploadFile(FIX + "/bulletin-photo.png");
+  await p.waitForSelector("#bi-apply", { timeout: 120000 }).catch(() => {});
+  const body = await txt(p, "#bulletin");
+  const ok = body.includes("1 823,07") && body.includes("220,56");
+  t(ok, `photo du bulletin (OCR, ${Math.round((Date.now() - t0) / 1000)} s) : salaire de base et IFM lus`);
+  if (!ok) console.log(body.slice(0, 1200));
+  await p.evaluate(() => document.querySelector("#bulletin").scrollIntoView({ block: "start" }));
+  await wait(900);
+  await p.screenshot({ path: `${OUT}/2d-ma-paie-photo-bulletin.png` });
+  await click(p, "#bi-apply");
+  await wait(600);
+  t((await p.$eval("#b-base", (e) => e.value)) === "1823.07", "formulaire du bulletin pré-rempli, à valider");
+  await p.close();
+}
+
 console.log("=== Service worker et manifeste (sous-chemin) ===");
 {
   const p = await newPage();

@@ -274,7 +274,7 @@ export default {
     const c = ctx.state.contrats.get(ctx.meta.currentContrat);
     if (!c) {
       el.innerHTML = `<div class="card"><h2>Bienvenue, chef 👷</h2><p>Je travaille, je note mes heures, Paie Juste vérifie ma paie. <b>Tout reste sur ce téléphone.</b></p>
-        <button class="btn primary" id="go-c">Ajouter mon contrat</button><button class="btn" id="go-demo">Voir l'exemple (données fictives)</button></div>`;
+        <button class="btn primary" id="go-c">📷 Ajouter mon contrat (photo ou à la main)</button><button class="btn" id="go-demo">Voir l'exemple (données fictives)</button></div>`;
       el.querySelector("#go-c").onclick = () => ctx.go("contrat");
       el.querySelector("#go-demo").onclick = () => ctx.setDemo(true);
       return;

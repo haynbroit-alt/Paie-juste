@@ -6,6 +6,7 @@ Plus rapide, plus clair. Les montants de paie ne changent pas.
 
 - Mes heures : un bouton « ✔ Aujourd'hui comme d'habitude » enregistre la journée en un geste avec vos horaires habituels. Les autres horaires restent accessibles en dessous.
 - Look clair et simple : fond blanc, texte foncé, jaune réservé aux boutons.
+- Ma paie : bouton « 📷 Photo ou PDF de ma fiche de paie ». La lecture se fait sur le téléphone (OCR embarqué). Les montants trouvés (heures, base, heures sup, primes, IFM, ICCP, frais) sont proposés avec leur ligne d'origine, à cocher puis à enregistrer. Le brut et le net lus servent à vérifier.
 - Ma paie : un résumé « En bref » en tête (heures, heures sup, brut, net à recevoir, état du bulletin). Le détail semaine par semaine, le calcul ligne par ligne et les primes sont repliés.
 
 ## 0.3.0 — 2026-11-10
