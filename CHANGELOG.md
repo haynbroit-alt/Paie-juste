@@ -1,5 +1,13 @@
 # Journal des changements
 
+## 0.4.0 — 2026-11-10
+
+Plus rapide, plus clair. Les montants de paie ne changent pas.
+
+- Mes heures : un bouton « ✔ Aujourd'hui comme d'habitude » enregistre la journée en un geste avec vos horaires habituels. Les autres horaires restent accessibles en dessous.
+- Look clair et simple : fond blanc, texte foncé, jaune réservé aux boutons.
+- Ma paie : un résumé « En bref » en tête (heures, heures sup, brut, net à recevoir, état du bulletin). Le détail semaine par semaine, le calcul ligne par ligne et les primes sont repliés.
+
 ## 0.3.0 — 2026-11-10
 
 « Je travaille, je note mes heures, Paie Juste vérifie ma paie. » Les montants de paie ne changent pas.

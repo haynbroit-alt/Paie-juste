@@ -224,10 +224,20 @@ console.log("=== Mes heures : autre jour et rappels ===");
   await click(p, "#j-autre");
   await wait(400);
   t((await p.$eval("#j-date", (s) => s.value)) !== hier, "« Noter un autre jour » propose un jour libre");
+  t(!!(await p.$("#j-vite")), "bouton « comme d'habitude » proposé");
+  await click(p, "#j-vite");
+  await wait(900);
+  t(!!(await p.$("#j-modif")), "un seul geste : journée enregistrée avec les horaires habituels");
+  t((await txt(p, "#s-total")).replace(/\s/g, "").length > 0, "semaine mise à jour : " + (await txt(p, "#s-total")));
   await p.screenshot({ path: `${OUT}/1b-ma-journee.png`, fullPage: true });
   await click(p, "#go-paie");
   await wait(500);
   t(!!(await p.$(".forecast")), "bouton « détail de mon salaire » → onglet Ma paie");
+  const res = await txt(p, "#resume");
+  t(
+    res.includes("Heures travaillées") && res.includes("Net à recevoir") && res.includes("Mon bulletin"),
+    "Ma paie : résumé en clair",
+  );
 }
 
 // 3. Mise en demeure + impression

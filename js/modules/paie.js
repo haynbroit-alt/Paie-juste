@@ -88,10 +88,7 @@ function forecast(ctx, P, isCur) {
         x.libelle + " " + fmtEur((Number(x.montant) || 0) * (x.jours == null || x.jours === "" ? 1 : Number(x.jours))),
     )
     .join(", ");
-  const brut = prev ? prev.brutFin : P.exp.brut;
   return `<div class="card forecast"><h3>${isCur ? "Ce que vous allez toucher ce mois" : "Ce que vous auriez dû toucher"}</h3>
-    <div class="grid2">
-      <div class="kpi"><div class="l">Brut ${isCur ? "prévu" : "attendu"}</div><div class="v num">${fmtEur(brut)}</div></div>
       <div class="kpi"><div class="l">Net versé</div><div class="v num" style="color:var(--green)">${fmtEur(N.netVerse)}</div></div>
     </div>
     <table class="calc" id="net-decompte" style="margin-top:.6rem">
@@ -116,13 +113,39 @@ function forecast(ctx, P, isCur) {
     <span class="tag warn">estimation</span></div>`;
 }
 
+function resumeCard(ctx, P, periode, isCur) {
+  const m = P.exp.minutes;
+  const sup = m.hs1 + m.hs2 + m.hc1 + m.hc2;
+  const prev = isCur
+    ? previsionMois(ctx.state, P.contrat.id, parisDate(nowIso()), { net: ctx.meta.netOpts || {} })
+    : null;
+  const brut = prev ? prev.brutFin : P.exp.brut;
+  const net = (prev ? prev.netFin : P.net).netVerse;
+  const v = P.cmp.verdict;
+  const bulletin =
+    v === "doit"
+      ? `<b style="color:var(--red)">il manque ${fmtEur(P.cmp.total)}</b>`
+      : v === "ordre" || v === "trop_percu"
+        ? `<b style="color:var(--green)">conforme ✓</b>`
+        : `<a href="#bulletin">à saisir ↓</a>`;
+  return `<div class="card resume" id="resume"><h2>En bref</h2>
+    <table class="resume">
+      <tr><td>Heures travaillées</td><td class="r num">${fmtH(m.total)}</td></tr>
+      ${sup ? `<tr><td>dont heures sup</td><td class="r num">${fmtH(sup)}</td></tr>` : ""}
+      <tr><td>Salaire brut${prev ? " prévu" : ""}</td><td class="r num">${fmtEur(brut)}</td></tr>
+      <tr class="tot"><td>Net à recevoir</td><td class="r num">${fmtEur(net)}</td></tr>
+      <tr><td>Mon bulletin</td><td class="r">${bulletin}</td></tr>
+    </table>
+    <p class="small muted">Estimation, à vérifier.</p></div>`;
+}
+
 function primesCard(P) {
-  return `<div class="card"><h3>Primes et indemnités de la période</h3>
+  return `<details class="card"><summary><h3>Primes et indemnités</h3></summary>
     ${P.primes.length ? `<table class="calc">${P.primes.map((p) => `<tr><td>${esc(p.libelle)}${p.avantage ? ' <span class="tag">contrat</span>' : ""}<span class="art">${p.base ? "soumis (compte dans le brut)" : "frais non soumis"}</span></td><td class="r num">${fmtEur((Number(p.montant) || 0) * (p.jours == null || p.jours === "" ? 1 : Number(p.jours)))}</td></tr>`).join("")}</table>` : `<p class="muted">Aucune. Les montants de panier, trajet, transport dépendent de votre convention : l'appli n'en invente aucun.</p>`}
     <div class="grid2"><div><label for="p-lib">Libellé</label><input id="p-lib" type="text" placeholder="Ex. : panier"></div><div><label for="p-mt">Montant (€)</label><input id="p-mt" type="number" inputmode="decimal" step="0.01"></div></div>
     <div class="grid2"><div><label for="p-j">Nombre (jours…)</label><input id="p-j" type="number" inputmode="numeric" value="1"></div><div><label for="p-d">Date</label><input id="p-d" type="date"></div></div>
     <label class="check"><input type="checkbox" id="p-base" checked><span>C'est du salaire (soumis, compte dans la base des indemnités). Décochez pour un remboursement de frais.</span></label>
-    <button class="btn" id="p-add">＋ Ajouter (scellé)</button></div>`;
+    <button class="btn" id="p-add">＋ Ajouter (scellé)</button></details>`;
 }
 
 function bulletinCard(P) {
@@ -141,7 +164,7 @@ function bulletinCard(P) {
       : []),
     ["frais", "Indemnités de frais (€)"],
   ];
-  return `<div class="card"><h3>Mon bulletin reçu</h3><p class="small muted">Recopiez les montants bruts. Laissez vide ce qui n'apparaît pas : la ligne ne sera pas comparée.</p>
+  return `<div class="card" id="bulletin"><h3>Mon bulletin reçu</h3><p class="small muted">Recopiez les montants bruts. Laissez vide ce qui n'apparaît pas : la ligne ne sera pas comparée.</p>
     <div class="grid2">${fields.map(([k, l]) => `<div><label for="b-${k}">${l}</label><input id="b-${k}" type="number" inputmode="decimal" step="0.01" value="${b[k] ?? (k === "fin" ? (b.ifm ?? "") : "")}"></div>`).join("")}</div>
     <button class="btn primary" id="b-save">Enregistrer le bulletin (scellé)</button></div>`;
 }
@@ -177,12 +200,13 @@ export default {
     const opts = [...new Set([...months, cur])].sort().reverse();
     el.innerHTML = `${contratSelect(ctx)}
       <div class="row" style="margin-bottom:.8rem"><select id="per" class="grow">${opts.map((m) => `<option value="${m}" ${m === periode ? "selected" : ""}>${fmtMois(m)}</option>`).join("")}<option value="contrat" ${periode === "contrat" ? "selected" : ""}>Toute la durée du contrat</option></select></div>
-      ${hero(P)}
+      ${resumeCard(ctx, P, periode, periode === cur)}
+      ${P.cmp.verdict === "doit" ? hero(P) : ""}
       ${forecast(ctx, P, periode === cur)}
-      <div class="card"><h3>Mes heures, semaine par semaine</h3>${bars(P)}
+      <details class="card"><summary><h3>Mes heures, semaine par semaine</h3></summary>${bars(P)}
         ${P.weeks.some((w) => w.flags.includes("tiers")) ? `<p class="note">⚠ Une semaine dépasse le tiers de votre durée de contrat (limite des heures complémentaires, L3123-20).</p>` : ""}
-        ${P.weeks.some((w) => w.flags.includes("legale")) ? `<p class="note">⚠ Une semaine atteint 35 h alors que vous êtes à temps partiel (L3123-9).</p>` : ""}</div>
-      <div class="card"><h3>Calcul attendu — ${esc(periodLabel(periode))}</h3>
+        ${P.weeks.some((w) => w.flags.includes("legale")) ? `<p class="note">⚠ Une semaine atteint 35 h alors que vous êtes à temps partiel (L3123-9).</p>` : ""}</details>
+      <details class="card"><summary><h3>Calcul ligne par ligne</h3></summary>
         <table class="calc">${P.exp.lines
           .filter((l) => l.montant || ["base", "hs1"].includes(l.key))
           .map(
@@ -202,7 +226,7 @@ export default {
                 .join("<br>")}</p>`
             : ""
         }
-        ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</div>
+        ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</details>
       ${bulletinCard(P)}
       ${compareCard(P)}
       ${primesCard(P)}
