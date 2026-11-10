@@ -1,0 +1,22 @@
+# Hébergement Netlify : site statique, sans étape de build. Les fichiers sont servis tels quels.
+[build]
+  publish = "."
+  command = ""
+
+# Le service worker doit être relu à chaque visite pour que les mises à jour arrivent.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

@@ -12,6 +12,11 @@ Chaque saisie est scellée dans une chaîne d'empreintes SHA-256. Pas de compte,
 2. Menu Chrome (⋮) > **Ajouter à l'écran d'accueil**.
 3. Lancez Paie Juste depuis l'icône. L'application s'ouvre ensuite sans connexion.
 
+## Héberger sur Netlify (au lieu de GitHub Pages)
+
+`netlify.toml` est prêt : pas d'étape de build, le dossier publié est la racine.
+Sur [app.netlify.com](https://app.netlify.com) : **Add new project** > **Import an existing project** > **GitHub** > `Paie-juste`, puis **Deploy**. Chaque fusion sur `main` republie le site.
+
 ## Avertissement
 
 Les montants sont une **estimation**, à vérifier. **Ce n'est pas un conseil juridique.** Une convention collective peut prévoir mieux que la loi.
