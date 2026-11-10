@@ -1,4 +1,6 @@
-/* Service worker Paie Juste : cache local, hors ligne, aucune ressource externe. */
+/* Service worker Paie Juste : cache local, hors ligne, aucune ressource externe.
+   URLs relatives au script, pour que le cache et le scope restent dans le dossier
+   de l'appli — en local « / », sur GitHub Pages « /Paie-juste/ ». */
 const VERSION = "paie-juste-v0.1.0";
 const CORE = ["./", "./index.html", "./manifest.json", "./css/app.css", "./js/app.js", "./js/calc.js", "./js/chain.js", "./js/compute.js", "./js/contrat-parse.js", "./js/db.js", "./js/demo.js", "./js/export.js", "./js/importer.js", "./js/letters.js", "./js/util.js", "./js/version.js",
   "./js/modules/pointer.js", "./js/modules/paie.js", "./js/modules/reclamer.js", "./js/modules/contrat.js", "./js/modules/donnees.js",

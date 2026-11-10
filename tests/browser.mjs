@@ -1,14 +1,22 @@
 /** Tests dans Chrome headless (puppeteer-core) + captures 390×844. Usage : node browser.mjs [url] */
-import puppeteer from "/tmp/libs/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js";
+import puppeteer from "puppeteer-core";
 import fs from "node:fs";
 import path from "node:path";
 const BASE = process.argv[2] || "http://127.0.0.1:8781/";
-const OUT = path.resolve(new URL(".", import.meta.url).pathname, "../../captures");
+const OUT = process.env.PJ_CAPTURES
+  ? path.resolve(process.env.PJ_CAPTURES)
+  : path.resolve(new URL(".", import.meta.url).pathname, "../captures");
 const FIX = path.resolve(new URL(".", import.meta.url).pathname, "fixtures");
 fs.mkdirSync(OUT, { recursive: true });
 let ok = 0, ko = 0;
 const t = (c, m) => (c ? (ok++, console.log("  OK   " + m)) : (ko++, console.error("  FAIL " + m)));
-const browser = await puppeteer.launch({ executablePath: "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", "--lang=fr-FR"] });
+const chromeCandidates = [process.env.CHROME_PATH, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/local/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].filter(Boolean);
+const executablePath = chromeCandidates.find((p) => fs.existsSync(p));
+if (!executablePath) {
+  console.error("Chrome introuvable. Installez google-chrome ou définissez CHROME_PATH.");
+  process.exit(1);
+}
+const browser = await puppeteer.launch({ executablePath, headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", "--lang=fr-FR"] });
 const errors = [];
 const external = [];
 async function newPage() {
@@ -128,6 +136,60 @@ console.log("=== Import de contrat (local) ===");
   t((body.match(/CDD/) || []).length > 0, "photo : type CDD reconnu");
   await wait(700); await p.screenshot({ path: `${OUT}/4c-contrat-import-photo.png` });
   await p.close(); }
+
+console.log("=== Service worker et manifeste (sous-chemin) ===");
+{
+  const p = await newPage();
+  const basePath = (() => { const u = new URL(BASE); return u.pathname.endsWith("/") ? u.pathname : u.pathname + "/"; })();
+  await p.goto(BASE, { waitUntil: "load" });
+  let info = null;
+  try {
+    info = await p.evaluate(async () => {
+      const link = document.querySelector('link[rel="manifest"]').href;
+      const manRes = await fetch(link);
+      const manifest = await manRes.json();
+      const abs = (u) => new URL(u, link).href;
+      const iconChecks = [];
+      for (const ic of manifest.icons) {
+        const r = await fetch(abs(ic.src));
+        iconChecks.push({ status: r.status });
+      }
+      let swError = null;
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        try { reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" }); }
+        catch (e) { swError = String(e && (e.message || e)); }
+      }
+      let scope = null, script = null;
+      if (!swError) {
+        try {
+          const ready = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((_, rej) => setTimeout(() => rej(new Error("service worker inactif après 20 s")), 20000)),
+          ]);
+          scope = ready.scope;
+          script = ready.active && ready.active.scriptURL;
+        } catch (e) { swError = String(e && (e.message || e)); }
+      }
+      return {
+        manifestStatus: manRes.status,
+        start: abs(manifest.start_url || "./"),
+        scopeUrl: abs(manifest.scope || "./"),
+        iconChecks, swError, scope, script,
+      };
+    });
+  } catch (e) { t(false, "service worker / manifeste : " + e); }
+  if (info) {
+    t(info.manifestStatus === 200, "manifest.json chargé");
+    t(new URL(info.start).pathname.startsWith(basePath), "start_url dans le dossier de l'appli : " + info.start);
+    t(new URL(info.scopeUrl).pathname === basePath, "scope du manifeste = dossier de l'appli : " + info.scopeUrl);
+    t(!info.swError, "service worker enregistré" + (info.swError ? " : " + info.swError : ""));
+    if (info.scope) t(new URL(info.scope).pathname === basePath, "scope du service worker : " + info.scope);
+    if (info.script) t(new URL(info.script).pathname === basePath + "sw.js", "script du service worker : " + info.script);
+    t(info.iconChecks.length >= 2 && info.iconChecks.every((i) => i.status === 200), "icônes du manifeste accessibles");
+  }
+  await p.close();
+}
 
 t(external.length === 0, "aucune requête hors de l'appli" + (external.length ? " : " + external.join(", ") : ""));
 t(errors.length === 0, "aucune erreur JavaScript" + (errors.length ? " : " + errors.slice(0, 5).join(" | ") : ""));

@@ -7,6 +7,8 @@ import { parseContrat } from "../js/contrat-parse.js";
 import { lettreAmiable, miseEnDemeure, annexeReleve } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
 import { parisLocalToIso } from "../js/util.js";
+import fs from "node:fs";
+import path from "node:path";
 
 let ok = 0, ko = 0;
 const t = (c, m) => (c ? (ok++, console.log("  OK   " + m)) : (ko++, console.error("  FAIL " + m)));
@@ -170,6 +172,26 @@ console.log("=== 12. Net versé = net avant impôt − impôt + indemnités non 
   eq(P0.net.cotisations, 557.33, "cotisations 557,33 (calcul à la main)");
   eq(P0.net.netAvantImpot, 2431.98, "net avant impôt 2 431,98 = 2 989,31 − 557,33");
   eq(P0.net.netVerse, 2651.98, "net versé 2 651,98 = 2 431,98 − 0 + 220"); }
+
+console.log("=== 13. Chemins relatifs pour GitHub Pages (/Paie-juste/) ===");
+{
+  const root = path.resolve(new URL(".", import.meta.url).pathname, "..");
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
+  const pages = "https://haynbroit-alt.github.io/Paie-juste/";
+  const manifestUrl = new URL("manifest.json", pages);
+  t(String(manifest.start_url).startsWith("./") && String(manifest.scope).startsWith("./"), "manifeste : start_url et scope relatifs");
+  t(manifest.icons.every((i) => String(i.src).startsWith("./")), "manifeste : icônes relatives");
+  t(!/href="\//.test(html) && !/src="\//.test(html), "HTML : aucun chemin à la racine du domaine");
+  t(/register\(\s*"\.\/sw\.js"/.test(app) && !/register\(\s*"\//.test(app), "service worker enregistré en relatif, pas à la racine du domaine");
+  const start = new URL(manifest.start_url, manifestUrl);
+  const scope = new URL(manifest.scope, manifestUrl);
+  t(start.pathname.startsWith("/Paie-juste/"), "start_url résolu : " + start.pathname);
+  t(scope.pathname === "/Paie-juste/", "scope résolu : " + scope.pathname);
+  t(manifest.icons.every((i) => new URL(i.src, manifestUrl).pathname.startsWith("/Paie-juste/icons/")), "icônes résolues sous /Paie-juste/icons/");
+  t(new URL("./sw.js", pages).pathname === "/Paie-juste/sw.js", "sw.js résolu sous /Paie-juste/");
+}
 
 console.log(`\n${ok} réussis, ${ko} échoués`);
 process.exit(ko ? 1 : 0);

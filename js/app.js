@@ -92,5 +92,6 @@ if (params.get("onglet")) ctx.view = params.get("onglet");
 ctx.setDemo(startDemo).catch((e) => { document.body.insertAdjacentHTML("beforeend", `<p class="note bad">Erreur au démarrage : ${String(e.message || e)}</p>`); });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:" && !params.has("nosw")) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  // Scope « ./ » : le dossier de la page ( / en local, /Paie-juste/ sur GitHub Pages).
+  navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
 }
