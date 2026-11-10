@@ -1,5 +1,14 @@
 # Journal des changements
 
+## 0.2.0 — 2026-11-10
+
+Plus simple au quotidien. Les montants de paie ne changent pas.
+
+- Pointer : nouvelle carte « Ma journée ». On note le début, la fin et la pause une fois par jour, au lieu de quatre boutons. Les pointages sont scellés comme avant et marqués « journée saisie ».
+- Rappel du soir : un lien crée dans Google Agenda un rappel chaque soir de semaine, et un autre le dernier jour du mois pour vérifier la paie. Un fichier .ics est proposé pour les autres agendas. C'est l'agenda du téléphone qui envoie la notification.
+- Bandeau après 17 h si rien n'est noté pour aujourd'hui.
+- Bouton « Voir le détail de mon salaire du mois » en haut de l'onglet Pointer.
+
 ## 0.1.2 — 2026-11-10
 
 Sans changement des montants de paie.

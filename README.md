@@ -30,6 +30,8 @@ Captures du mode EXEMPLE, données fictives.
 
 ![Pointer : heures en cours](captures/1-pointer.png)
 
+![Ma journée : début, fin, pause en une fois](captures/1b-ma-journee.png)
+
 ![Ma paie : écart estimé avec le bulletin](captures/2-ma-paie.png)
 
 ![Réclamer : brouillon de demande amiable](captures/3-reclamer.png)

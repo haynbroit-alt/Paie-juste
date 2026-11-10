@@ -180,6 +180,66 @@ t(
 t(shots.contrat.includes("Intérim") && shots.contrat.includes("EXEMPLE"), "Contrat : fiche exemple");
 t(/AU TRAVAIL|PAS POINTÉ|EN PAUSE/.test(shots.pointer.toUpperCase()), "Pointer : état affiché");
 
+// 2 bis. Saisie simple de la journée et rappels
+console.log("=== Ma journée en une fois ===");
+{
+  const p = await newPage();
+  await p.goto(BASE + "?nosw", { waitUntil: "networkidle0" });
+  await click(p, "#go-c");
+  await p.select("#f-type", "cdi");
+  await wait(300);
+  await p.type("#f-taux", "12");
+  await p.type("#f-employeur", "Journée SARL");
+  await click(p, "#f-save");
+  await wait(500);
+  await p.evaluate(() => window.__pj.go("pointer"));
+  await wait(300);
+  t(!!(await p.$("#journee")), "carte « Ma journée » affichée");
+  const hier = await p.evaluate(() => {
+    const d = new Date(Date.now() - 864e5);
+    return d.toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+  });
+  await p.$eval(
+    "#j-date",
+    (e, v) => {
+      e.value = v;
+      e.dispatchEvent(new Event("input"));
+    },
+    hier,
+  );
+  await p.$eval("#j-debut", (e) => {
+    e.value = "07:30";
+    e.dispatchEvent(new Event("input"));
+  });
+  await p.$eval("#j-fin", (e) => {
+    e.value = "16:30";
+    e.dispatchEvent(new Event("input"));
+  });
+  await p.select("#j-pause", "60");
+  await p.$eval("#j-pause", (e) => e.dispatchEvent(new Event("input")));
+  t((await txt(p, "#j-total")).replace(/\s/g, "").startsWith("8"), "total affiché : " + (await txt(p, "#j-total")));
+  await click(p, "#j-ok");
+  await wait(900);
+  const types = await p.evaluate(async () => (await window.__pj.store.all()).map((x) => x.type).join(","));
+  t(types === "genesis,contrat,punch,punch,punch,punch", "4 pointages scellés : " + types);
+  t((await txt(p, ".timeline")).includes("journée saisie"), "pointages marqués « journée saisie »");
+  await p.$eval(
+    "#j-date",
+    (e, v) => {
+      e.value = v;
+      e.dispatchEvent(new Event("input"));
+    },
+    hier,
+  );
+  t(await p.$eval("#j-ok", (b) => b.disabled), "même jour une 2e fois : bouton désactivé");
+  const href = await p.$eval("#r-soir", (a) => a.href);
+  t(href.startsWith("https://calendar.google.com/") && href.includes("FREQ%3DWEEKLY"), "lien de rappel Google Agenda");
+  await p.screenshot({ path: `${OUT}/1b-ma-journee.png`, fullPage: true });
+  await click(p, "#go-paie");
+  await wait(500);
+  t(!!(await p.$(".forecast")), "bouton « détail de mon salaire » → onglet Ma paie");
+}
+
 // 3. Mise en demeure + impression
 {
   const p = await newPage();
