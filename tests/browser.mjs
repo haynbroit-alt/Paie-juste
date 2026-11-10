@@ -224,10 +224,20 @@ console.log("=== Mes heures : autre jour et rappels ===");
   await click(p, "#j-autre");
   await wait(400);
   t((await p.$eval("#j-date", (s) => s.value)) !== hier, "« Noter un autre jour » propose un jour libre");
+  t(!!(await p.$("#j-vite")), "bouton « comme d'habitude » proposé");
+  await click(p, "#j-vite");
+  await wait(900);
+  t(!!(await p.$("#j-modif")), "un seul geste : journée enregistrée avec les horaires habituels");
+  t((await txt(p, "#s-total")).replace(/\s/g, "").length > 0, "semaine mise à jour : " + (await txt(p, "#s-total")));
   await p.screenshot({ path: `${OUT}/1b-ma-journee.png`, fullPage: true });
   await click(p, "#go-paie");
   await wait(500);
   t(!!(await p.$(".forecast")), "bouton « détail de mon salaire » → onglet Ma paie");
+  const res = await txt(p, "#resume");
+  t(
+    res.includes("Heures travaillées") && res.includes("Net à recevoir") && res.includes("Mon bulletin"),
+    "Ma paie : résumé en clair",
+  );
 }
 
 // 3. Mise en demeure + impression
@@ -299,6 +309,34 @@ console.log("=== Import de contrat (local) ===");
   t((body.match(/CDD/) || []).length > 0, "photo : type CDD reconnu");
   await wait(700);
   await p.screenshot({ path: `${OUT}/4c-contrat-import-photo.png` });
+  await p.close();
+}
+
+console.log("=== Photo du bulletin de paie (OCR local) ===");
+{
+  const gen = await newPage();
+  await gen.setViewport({ width: 1000, height: 640 });
+  await gen.goto("file://" + FIX + "/bulletin.html");
+  await gen.screenshot({ path: FIX + "/bulletin-photo.png" });
+  await gen.close();
+  const p = await newPage();
+  await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(600);
+  const input = await p.$("#bi-file");
+  t(!!input, "Ma paie : bouton « Photo ou PDF de ma fiche de paie »");
+  const t0 = Date.now();
+  await input.uploadFile(FIX + "/bulletin-photo.png");
+  await p.waitForSelector("#bi-apply", { timeout: 120000 }).catch(() => {});
+  const body = await txt(p, "#bulletin");
+  const ok = body.includes("1 823,07") && body.includes("220,56");
+  t(ok, `photo du bulletin (OCR, ${Math.round((Date.now() - t0) / 1000)} s) : salaire de base et IFM lus`);
+  if (!ok) console.log(body.slice(0, 1200));
+  await p.evaluate(() => document.querySelector("#bulletin").scrollIntoView({ block: "start" }));
+  await wait(900);
+  await p.screenshot({ path: `${OUT}/2d-ma-paie-photo-bulletin.png` });
+  await click(p, "#bi-apply");
+  await wait(600);
+  t((await p.$eval("#b-base", (e) => e.value)) === "1823.07", "formulaire du bulletin pré-rempli, à valider");
   await p.close();
 }
 

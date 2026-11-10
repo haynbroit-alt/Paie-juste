@@ -2,8 +2,55 @@ import { fmtEur, fmtH, parisDate, TYPES, COTIS_2026, round2 } from "../calc.js";
 import { computePeriod, contratRows, periodsOf, previsionMois, prescriptionInfo } from "../compute.js";
 import { esc, fmtMois, fmtJour, nowIso } from "../util.js";
 import { contratSelect, bindContratSelect } from "./pointer.js";
+import { parseBulletin } from "../bulletin-parse.js";
 
 const ui = { periode: null, avecFin: null };
+/** Lecture d'un bulletin (photo ou PDF) : état de l'écran, rien n'est enregistré ici. */
+const bimp = { progress: null, error: "", champs: null, periode: null, fill: null, raw: "" };
+const NOMS_CHAMPS = {
+  heures: "Heures payées",
+  base: "Salaire de base",
+  hc: "Heures complémentaires",
+  hs: "Heures sup",
+  primes: "Primes",
+  fin: "Indemnité de fin (IFM / précarité)",
+  iccp: "Congés payés (ICCP)",
+  frais: "Indemnités de frais",
+  brut: "Salaire brut (pour vérifier)",
+  net: "Net à payer (pour vérifier)",
+};
+
+async function lireBulletin(ctx, file) {
+  Object.assign(bimp, { error: "", champs: null, periode: null, progress: { status: "Préparation", progress: 0 } });
+  ctx.go("paie");
+  const prog = (m) => {
+    bimp.progress = m;
+    const bar = document.querySelector("#bi-bar");
+    const st = document.querySelector("#bi-st");
+    if (bar) bar.style.width = Math.round((m.progress || 0) * 100) + "%";
+    if (st) st.textContent = m.status || "";
+  };
+  try {
+    const { pdfToText, pdfPageToBlob, imageToText } = await import("../importer.js");
+    let text = "";
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      const r = await pdfToText(file, prog);
+      text = r.text;
+      if (text.replace(/\s/g, "").length < 40) text = (await imageToText(await pdfPageToBlob(r.doc, 1), prog)).text;
+    } else text = (await imageToText(file, prog)).text;
+    analyserBulletin(text);
+  } catch (e) {
+    bimp.error = "Lecture impossible : " + (e.message || e) + ". Vous pouvez recopier les montants à la main.";
+  }
+  bimp.progress = null;
+  ctx.go("paie");
+}
+function analyserBulletin(text) {
+  bimp.raw = text;
+  const r = parseBulletin(text);
+  bimp.champs = r.champs;
+  bimp.periode = r.periode;
+}
 export function selectedPeriod(ctx) {
   const c = ctx.state.contrats.get(ctx.meta.currentContrat);
   if (!c) return null;
@@ -88,10 +135,7 @@ function forecast(ctx, P, isCur) {
         x.libelle + " " + fmtEur((Number(x.montant) || 0) * (x.jours == null || x.jours === "" ? 1 : Number(x.jours))),
     )
     .join(", ");
-  const brut = prev ? prev.brutFin : P.exp.brut;
   return `<div class="card forecast"><h3>${isCur ? "Ce que vous allez toucher ce mois" : "Ce que vous auriez dû toucher"}</h3>
-    <div class="grid2">
-      <div class="kpi"><div class="l">Brut ${isCur ? "prévu" : "attendu"}</div><div class="v num">${fmtEur(brut)}</div></div>
       <div class="kpi"><div class="l">Net versé</div><div class="v num" style="color:var(--green)">${fmtEur(N.netVerse)}</div></div>
     </div>
     <table class="calc" id="net-decompte" style="margin-top:.6rem">
@@ -116,16 +160,42 @@ function forecast(ctx, P, isCur) {
     <span class="tag warn">estimation</span></div>`;
 }
 
+function resumeCard(ctx, P, periode, isCur) {
+  const m = P.exp.minutes;
+  const sup = m.hs1 + m.hs2 + m.hc1 + m.hc2;
+  const prev = isCur
+    ? previsionMois(ctx.state, P.contrat.id, parisDate(nowIso()), { net: ctx.meta.netOpts || {} })
+    : null;
+  const brut = prev ? prev.brutFin : P.exp.brut;
+  const net = (prev ? prev.netFin : P.net).netVerse;
+  const v = P.cmp.verdict;
+  const bulletin =
+    v === "doit"
+      ? `<b style="color:var(--red)">il manque ${fmtEur(P.cmp.total)}</b>`
+      : v === "ordre" || v === "trop_percu"
+        ? `<b style="color:var(--green)">conforme ✓</b>`
+        : `<a href="#bulletin">à saisir ↓</a>`;
+  return `<div class="card resume" id="resume"><h2>En bref</h2>
+    <table class="resume">
+      <tr><td>Heures travaillées</td><td class="r num">${fmtH(m.total)}</td></tr>
+      ${sup ? `<tr><td>dont heures sup</td><td class="r num">${fmtH(sup)}</td></tr>` : ""}
+      <tr><td>Salaire brut${prev ? " prévu" : ""}</td><td class="r num">${fmtEur(brut)}</td></tr>
+      <tr class="tot"><td>Net à recevoir</td><td class="r num">${fmtEur(net)}</td></tr>
+      <tr><td>Mon bulletin</td><td class="r">${bulletin}</td></tr>
+    </table>
+    <p class="small muted">Estimation, à vérifier.</p></div>`;
+}
+
 function primesCard(P) {
-  return `<div class="card"><h3>Primes et indemnités de la période</h3>
+  return `<details class="card"><summary><h3>Primes et indemnités</h3></summary>
     ${P.primes.length ? `<table class="calc">${P.primes.map((p) => `<tr><td>${esc(p.libelle)}${p.avantage ? ' <span class="tag">contrat</span>' : ""}<span class="art">${p.base ? "soumis (compte dans le brut)" : "frais non soumis"}</span></td><td class="r num">${fmtEur((Number(p.montant) || 0) * (p.jours == null || p.jours === "" ? 1 : Number(p.jours)))}</td></tr>`).join("")}</table>` : `<p class="muted">Aucune. Les montants de panier, trajet, transport dépendent de votre convention : l'appli n'en invente aucun.</p>`}
     <div class="grid2"><div><label for="p-lib">Libellé</label><input id="p-lib" type="text" placeholder="Ex. : panier"></div><div><label for="p-mt">Montant (€)</label><input id="p-mt" type="number" inputmode="decimal" step="0.01"></div></div>
     <div class="grid2"><div><label for="p-j">Nombre (jours…)</label><input id="p-j" type="number" inputmode="numeric" value="1"></div><div><label for="p-d">Date</label><input id="p-d" type="date"></div></div>
     <label class="check"><input type="checkbox" id="p-base" checked><span>C'est du salaire (soumis, compte dans la base des indemnités). Décochez pour un remboursement de frais.</span></label>
-    <button class="btn" id="p-add">＋ Ajouter (scellé)</button></div>`;
+    <button class="btn" id="p-add">＋ Ajouter (scellé)</button></details>`;
 }
 
-function bulletinCard(P) {
+function bulletinCard(P, periode) {
   const b = P.bulletin || {};
   const fields = [
     ["heures", "Heures payées"],
@@ -141,8 +211,33 @@ function bulletinCard(P) {
       : []),
     ["frais", "Indemnités de frais (€)"],
   ];
-  return `<div class="card"><h3>Mon bulletin reçu</h3><p class="small muted">Recopiez les montants bruts. Laissez vide ce qui n'apparaît pas : la ligne ne sera pas comparée.</p>
-    <div class="grid2">${fields.map(([k, l]) => `<div><label for="b-${k}">${l}</label><input id="b-${k}" type="number" inputmode="decimal" step="0.01" value="${b[k] ?? (k === "fin" ? (b.ifm ?? "") : "")}"></div>`).join("")}</div>
+  const F = bimp.champs;
+  const fill = bimp.fill || {};
+  const lecture = `<label class="btn primary" for="bi-file" style="cursor:pointer">📷 Photo ou PDF de ma fiche de paie</label>
+    <input id="bi-file" type="file" accept="application/pdf,image/*" hidden>
+    ${bimp.progress ? `<p id="bi-st" class="small">${esc(bimp.progress.status || "")}</p><div class="progress"><i id="bi-bar"></i></div>` : ""}
+    ${bimp.error ? `<p class="note bad">${esc(bimp.error)}</p>` : ""}
+    ${
+      F
+        ? Object.keys(F).length
+          ? `<h3 style="margin-top:1rem">Trouvé sur le bulletin — cochez ce qui est juste</h3>
+      ${bimp.periode && bimp.periode !== periode ? `<p class="note">Ce bulletin semble concerner ${esc(fmtMois(bimp.periode))}.</p>` : ""}
+      ${Object.entries(F)
+        .map(
+          ([k, f]) =>
+            `<div class="field-proposal"><input type="checkbox" data-bk="${k}" ${k === "brut" || k === "net" ? "disabled" : "checked"} aria-label="${NOMS_CHAMPS[k] || k}"><div><b>${NOMS_CHAMPS[k] || k} :</b> ${k === "heures" ? String(f.value).replace(".", ",") + " h" : fmtEur(f.value)}<div class="ex">« ${esc(f.extrait)} »</div></div></div>`,
+        )
+        .join("")}
+      <button class="btn" id="bi-apply">Remplir avec la sélection</button>`
+          : `<p class="note">Aucun montant reconnu. Recopiez-les ci-dessous.</p>`
+        : ""
+    }
+    <details><summary class="small" style="min-height:44px;display:flex;align-items:center">ou coller le texte du bulletin</summary>
+      <textarea id="bi-text" placeholder="Collez ici le texte du bulletin">${esc(bimp.raw)}</textarea><button class="btn" id="bi-parse">Analyser ce texte</button></details>`;
+  return `<div class="card" id="bulletin"><h3>Mon bulletin reçu</h3>
+    ${lecture}
+    <p class="small muted">Montants bruts. Laissez vide ce qui n'apparaît pas.</p>
+    <div class="grid2">${fields.map(([k, l]) => `<div><label for="b-${k}">${l}</label><input id="b-${k}" type="number" inputmode="decimal" step="0.01" value="${fill[k] ?? b[k] ?? (k === "fin" ? (b.ifm ?? "") : "")}"></div>`).join("")}</div>
     <button class="btn primary" id="b-save">Enregistrer le bulletin (scellé)</button></div>`;
 }
 
@@ -177,12 +272,13 @@ export default {
     const opts = [...new Set([...months, cur])].sort().reverse();
     el.innerHTML = `${contratSelect(ctx)}
       <div class="row" style="margin-bottom:.8rem"><select id="per" class="grow">${opts.map((m) => `<option value="${m}" ${m === periode ? "selected" : ""}>${fmtMois(m)}</option>`).join("")}<option value="contrat" ${periode === "contrat" ? "selected" : ""}>Toute la durée du contrat</option></select></div>
-      ${hero(P)}
+      ${resumeCard(ctx, P, periode, periode === cur)}
+      ${P.cmp.verdict === "doit" ? hero(P) : ""}
       ${forecast(ctx, P, periode === cur)}
-      <div class="card"><h3>Mes heures, semaine par semaine</h3>${bars(P)}
+      <details class="card"><summary><h3>Mes heures, semaine par semaine</h3></summary>${bars(P)}
         ${P.weeks.some((w) => w.flags.includes("tiers")) ? `<p class="note">⚠ Une semaine dépasse le tiers de votre durée de contrat (limite des heures complémentaires, L3123-20).</p>` : ""}
-        ${P.weeks.some((w) => w.flags.includes("legale")) ? `<p class="note">⚠ Une semaine atteint 35 h alors que vous êtes à temps partiel (L3123-9).</p>` : ""}</div>
-      <div class="card"><h3>Calcul attendu — ${esc(periodLabel(periode))}</h3>
+        ${P.weeks.some((w) => w.flags.includes("legale")) ? `<p class="note">⚠ Une semaine atteint 35 h alors que vous êtes à temps partiel (L3123-9).</p>` : ""}</details>
+      <details class="card"><summary><h3>Calcul ligne par ligne</h3></summary>
         <table class="calc">${P.exp.lines
           .filter((l) => l.montant || ["base", "hs1"].includes(l.key))
           .map(
@@ -202,8 +298,8 @@ export default {
                 .join("<br>")}</p>`
             : ""
         }
-        ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</div>
-      ${bulletinCard(P)}
+        ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</details>
+      ${bulletinCard(P, periode)}
       ${compareCard(P)}
       ${primesCard(P)}
       ${P.cmp.verdict === "doit" ? `<button class="btn primary" id="go-rec">Préparer ma réclamation →</button>` : ""}`;
@@ -235,12 +331,37 @@ export default {
       ctx.toast("Réglages enregistrés sur ce téléphone.");
       ctx.go("paie");
     };
+    el.querySelector("#bi-file").onchange = (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) lireBulletin(ctx, f);
+    };
+    el.querySelector("#bi-parse").onclick = () => {
+      analyserBulletin(el.querySelector("#bi-text").value);
+      ctx.go("paie");
+    };
+    const ap = el.querySelector("#bi-apply");
+    if (ap) {
+      ap.onclick = () => {
+        const fill = {};
+        el.querySelectorAll("[data-bk]").forEach((cb) => {
+          if (cb.checked && !cb.disabled) fill[cb.dataset.bk] = bimp.champs[cb.dataset.bk].value;
+        });
+        bimp.fill = fill;
+        if (bimp.periode && /^\d{4}-\d{2}$/.test(bimp.periode)) ui.periode = bimp.periode;
+        bimp.champs = null;
+        ctx.toast("Formulaire rempli : vérifiez puis enregistrez.");
+        ctx.go("paie");
+        document.querySelector("#bulletin")?.scrollIntoView({ block: "start" });
+      };
+    }
     el.querySelector("#b-save").onclick = async () => {
       const data = { contratId: c.id, periode };
       el.querySelectorAll('[id^="b-"]').forEach((i) => {
         if (i.tagName === "INPUT" && i.value !== "") data[i.id.slice(2)] = Number(i.value);
       });
       await ctx.append("bulletin", data);
+      bimp.fill = null;
+      bimp.raw = "";
       ctx.toast("Bulletin scellé.");
       ctx.refresh();
     };

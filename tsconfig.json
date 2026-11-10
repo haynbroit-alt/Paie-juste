@@ -11,6 +11,14 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["js/calc.js", "js/compute.js", "js/contrat-parse.js", "js/chain.js", "js/util.js", "js/journee.js"],
+  "include": [
+    "js/calc.js",
+    "js/compute.js",
+    "js/contrat-parse.js",
+    "js/chain.js",
+    "js/util.js",
+    "js/journee.js",
+    "js/bulletin-parse.js"
+  ],
   "exclude": ["vendor", "node_modules"]
 }

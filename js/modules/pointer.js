@@ -68,8 +68,17 @@ function journeeCard(ctx, today, jour, existant) {
   const jours = joursRecents(today, 21);
   if (!jours.includes(jour)) jours.push(jour);
   const modif = existant && !existant.supprimee;
+  const h = ctx.meta.journee;
+  const habitude = !modif && h ? journeePunches({ date: jour, ...h }) : null;
+  const vite = habitude && habitude.ok;
   return `<div class="card" id="journee">
       <h2>Ma journée</h2>
+      ${
+        vite
+          ? `<button class="btn primary big habitude" id="j-vite">✔ ${esc(nomJour(jour, today))} comme d'habitude<small>${esc(h.debut)} → ${esc(h.fin)}${Number(h.pauseMin) ? " · pause " + pauseLabel(Number(h.pauseMin)) : ""} · ${fmtH(habitude.minutes)}</small></button>
+      <details id="j-autres"><summary>Autres horaires ou autre jour</summary>`
+          : ""
+      }
       <label for="j-date">Jour</label><select id="j-date">${jours.map((d) => `<option value="${d}" ${d === jour ? "selected" : ""}>${esc(nomJour(d, today))}</option>`).join("")}</select>
       <div class="grid2">${heureChamp("j-debut", "Arrivée", v.debut)}${heureChamp("j-fin", "Départ", v.fin)}</div>
       <label for="j-pause">Pause (non payée)</label><select id="j-pause">${pauses.map((m) => `<option value="${m}" ${m === Number(v.pauseMin) ? "selected" : ""}>${pauseLabel(m)}</option>`).join("")}</select>
@@ -83,6 +92,7 @@ function journeeCard(ctx, today, jour, existant) {
       <p class="note bad" id="j-err" hidden></p>
       <button class="btn primary big" id="j-ok">${modif ? "ENREGISTRER LA MODIFICATION" : "ENREGISTRER MA JOURNÉE"}</button>
       ${modif ? `<button class="btn ghost" id="j-suppr">Supprimer cette journée</button>` : ""}
+      ${vite ? "</details>" : ""}
     </div>`;
 }
 
@@ -156,6 +166,22 @@ function bindJournee(ctx, el, c, existant) {
     ui.edit = false;
     ctx.refresh();
   };
+  const vite = $("#j-vite");
+  if (vite) {
+    vite.onclick = async () => {
+      const j = { date: $("#j-date").value, ...ctx.meta.journee };
+      const r = journeePunches(j);
+      if (!r.ok) return ctx.toast(r.erreur, true);
+      vite.disabled = true;
+      await enregistrer(ctx, c, j, r, existant, "");
+      if (navigator.vibrate) navigator.vibrate(60);
+      ctx.toast(`${nomJour(j.date, parisDate(nowIso()))} : ${fmtH(r.minutes)} enregistrées.`);
+      ui.semaine = weekKey(j.date);
+      ui.jour = j.date;
+      ui.edit = false;
+      ctx.refresh();
+    };
+  }
   const sup = $("#j-suppr");
   if (sup) {
     sup.onclick = async () => {
@@ -248,7 +274,7 @@ export default {
     const c = ctx.state.contrats.get(ctx.meta.currentContrat);
     if (!c) {
       el.innerHTML = `<div class="card"><h2>Bienvenue, chef 👷</h2><p>Je travaille, je note mes heures, Paie Juste vérifie ma paie. <b>Tout reste sur ce téléphone.</b></p>
-        <button class="btn primary" id="go-c">Ajouter mon contrat</button><button class="btn" id="go-demo">Voir l'exemple (données fictives)</button></div>`;
+        <button class="btn primary" id="go-c">📷 Ajouter mon contrat (photo ou à la main)</button><button class="btn" id="go-demo">Voir l'exemple (données fictives)</button></div>`;
       el.querySelector("#go-c").onclick = () => ctx.go("contrat");
       el.querySelector("#go-demo").onclick = () => ctx.setDemo(true);
       return;

@@ -1,22 +1,24 @@
 :root {
-  --bg: #08090b;
-  --card: #15171c;
-  --card2: #1d2027;
-  --line: #2e323c;
-  --fg: #faf8f2;
-  --muted: #c4beb1;
-  --dim: #b5ae9e;
-  --amber: #ffc82e;
-  --amber-bg: #2e2400;
-  --green: #2fd36b;
-  --green-bg: #0b2e18;
-  --red: #ff5a52;
-  --red-bg: #3a0f0d;
-  --blue: #7cc4ff;
+  --bg: #f4f3ef;
+  --card: #ffffff;
+  --card2: #f1efe9;
+  --line: #dcd8cd;
+  --fg: #16130d;
+  --muted: #514c43;
+  --dim: #5f594f;
+  /* --amber : texte et traits (foncé, lisible sur blanc) ; --jaune : fonds des boutons */
+  --amber: #8a5a00;
+  --amber-bg: #fff4d1;
+  --jaune: #ffc82e;
+  --green: #17763a;
+  --green-bg: #e4f5ea;
+  --red: #b3261e;
+  --red-bg: #fdeceb;
+  --blue: #1458a6;
   --r: 18px;
   --tap: 64px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
 * {
   box-sizing: border-box;
@@ -1046,4 +1048,153 @@ ul.jours li {
   padding: 0.75rem 0;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
+}
+
+/* Thème clair : remplace les teintes sombres codées en dur plus haut */
+header.top {
+  background: rgba(244, 243, 239, 0.95);
+}
+.logo,
+.btn.primary,
+.seg-ctl button[aria-pressed="true"],
+.progress i,
+.seg.h1 {
+  background: var(--jaune);
+  border-color: #e0aa00;
+  color: #1a1200;
+  box-shadow: none;
+}
+.seal-pill,
+.tag.ok {
+  border-color: #9fd3b2;
+}
+.seal-pill.bad,
+.tag.bad {
+  border-color: #efb4b0;
+}
+.tag.warn {
+  border-color: #e9cf85;
+}
+.note {
+  color: #4a3500;
+}
+.note.info {
+  background: #e8f1fc;
+  color: #0d3566;
+}
+.note.bad {
+  color: #6e1410;
+}
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+select,
+textarea {
+  background: #fff;
+  border-color: #cfcabd;
+}
+.btn {
+  background: #fff;
+}
+.btn.ghost {
+  background: transparent;
+}
+.hero.doit {
+  --glow: transparent;
+  border-color: #efb4b0;
+  background: #fdf1f0;
+}
+.hero.ordre {
+  --glow: transparent;
+  border-color: #9fd3b2;
+  background: #eef8f1;
+}
+.hero.doit .amount {
+  text-shadow: none;
+}
+.seg.n {
+  background: #9a958a;
+}
+.bar .line35 {
+  border-top-color: #16130d55;
+}
+.paper {
+  box-shadow: 0 4px 16px #0002;
+  border: 1px solid var(--line);
+}
+.drop {
+  border-color: #b9b3a6;
+}
+nav.tabs {
+  background: #fff;
+  border-top: 1px solid var(--line);
+}
+nav.tabs button[aria-current="page"] {
+  background: var(--amber-bg);
+}
+dialog::backdrop {
+  background: #0007;
+}
+#toast {
+  background: #16130d;
+  color: #fff;
+  box-shadow: 0 10px 30px #0004;
+}
+.demo-banner {
+  background: repeating-linear-gradient(-45deg, #ffc82e, #ffc82e 14px, #16130d 14px, #16130d 28px);
+}
+.demo-banner div {
+  background: #fff4d1;
+  color: #5a3c00;
+}
+.btn.habitude {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 88px;
+}
+.btn.habitude small {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+#j-autres > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  margin-top: 0.6rem;
+  font-weight: 800;
+  color: var(--muted);
+  cursor: pointer;
+}
+details.card > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+details.card > summary h3 {
+  margin: 0;
+}
+table.resume {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.08rem;
+}
+table.resume td {
+  padding: 0.65rem 0.2rem;
+  border-bottom: 1px solid var(--line);
+}
+table.resume td.r {
+  text-align: right;
+  font-weight: 800;
+}
+table.resume tr.tot td {
+  font-size: 1.35rem;
+  font-weight: 950;
+  color: var(--green);
+}
+table.resume td:first-child {
+  width: 58%;
 }
