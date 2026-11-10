@@ -21,6 +21,7 @@ import { parseContrat } from "../js/contrat-parse.js";
 import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
 import { parisLocalToIso } from "../js/util.js";
+import { journeePunches, motifJournee, googleAgendaUrl, rappelsIcs, rappelsParDefaut } from "../js/journee.js";
 import fs from "node:fs";
 import path from "node:path";
 import { runRules } from "./rules.mjs";
@@ -353,6 +354,64 @@ console.log("=== 13. Chemins relatifs pour GitHub Pages (/Paie-juste/) ===");
     "icônes résolues sous /Paie-juste/icons/",
   );
   t(new URL("./sw.js", pages).pathname === "/Paie-juste/sw.js", "sw.js résolu sous /Paie-juste/");
+}
+
+console.log("=== 22. Saisie simple de la journée et rappels ===");
+{
+  const j = journeePunches({ date: "2026-11-09", debut: "07:30", fin: "16:30", pauseMin: 60 });
+  t(j.ok && j.minutes === 480, "07:30-16:30, pause 1 h → 8 h");
+  t(
+    j.ok && j.punches.map((p) => p.action).join() === "debut,pause,reprise,fin",
+    "4 pointages : début, pause, reprise, fin",
+  );
+  t(j.ok && j.punches[0].at === parisLocalToIso("2026-11-09T07:30"), "début à l'heure de Paris saisie");
+  t(j.ok && j.punches[3].at === parisLocalToIso("2026-11-09T16:30"), "fin à l'heure de Paris saisie");
+  if (j.ok) {
+    const w = workIntervals(j.punches);
+    const mins = [...minutesByDay(w.intervals).values()].reduce((a, b) => a + b, 0);
+    t(mins === 480 && !w.anomalies.length, "le moteur de paie compte bien 8 h, sans anomalie");
+  }
+  const sans = journeePunches({ date: "2026-11-09", debut: "08:00", fin: "12:00", pauseMin: 0 });
+  t(sans.ok && sans.punches.length === 2 && sans.minutes === 240, "sans pause : 2 pointages, 4 h");
+  const dst = journeePunches({ date: "2026-10-25", debut: "07:00", fin: "16:00", pauseMin: 60 });
+  t(dst.ok && dst.minutes === 480, "jour du changement d'heure : 8 h");
+  t(!journeePunches({ date: "2026-11-09", debut: "16:00", fin: "08:00" }).ok, "fin avant début refusée");
+  t(
+    !journeePunches({ date: "2026-11-09", debut: "08:00", fin: "09:00", pauseMin: 60 }).ok,
+    "pause plus longue que la journée refusée",
+  );
+  t(!journeePunches({ date: "2026-11-09", debut: "8h", fin: "17:00" }).ok, "format d'heure invalide refusé");
+  t(!journeePunches({ date: "", debut: "08:00", fin: "17:00" }).ok, "date manquante refusée");
+  t(motifJournee(45).includes("45 min") && motifJournee(0) === "Journée saisie en une fois", "motif scellé explicite");
+
+  const [soir, mois] = rappelsParDefaut({ date: "2026-11-10", heure: "19:00", appUrl: "https://exemple.netlify.app/" });
+  const g = new URL(googleAgendaUrl(soir));
+  t(
+    g.hostname === "calendar.google.com" && g.searchParams.get("recur") === "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+    "Google Agenda : rappel chaque soir de semaine",
+  );
+  t(
+    g.searchParams.get("dates") === "20261110T190000/20261110T191000" && g.searchParams.get("ctz") === "Europe/Paris",
+    "Google Agenda : 19 h, heure de Paris",
+  );
+  t(
+    new URL(googleAgendaUrl(mois)).searchParams.get("recur") === "RRULE:FREQ=MONTHLY;BYMONTHDAY=-1",
+    "Google Agenda : dernier jour du mois",
+  );
+  const ics = rappelsIcs([soir, mois], "20261110T120000Z");
+  t(
+    ics.split("BEGIN:VEVENT").length === 3 && ics.split("BEGIN:VALARM").length === 3,
+    ".ics : 2 événements avec alarme",
+  );
+  t(
+    ics.includes("DTSTART;TZID=Europe/Paris:20261110T190000") && ics.includes("RRULE:FREQ=MONTHLY;BYMONTHDAY=-1"),
+    ".ics : heure et récurrence",
+  );
+  t(
+    ics.includes("\r\n") && ics.includes("https://exemple.netlify.app/"),
+    ".ics : fins de ligne CRLF et lien de l'appli",
+  );
+  t(!/€|salaire brut|@/.test(ics.replaceAll("@paie-juste", "")), ".ics : aucune donnée de paie");
 }
 
 runRules(t, eq);
