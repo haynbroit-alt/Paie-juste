@@ -1,5 +1,15 @@
 # Journal des changements
 
+## 0.3.0 — 2026-11-10
+
+« Je travaille, je note mes heures, Paie Juste vérifie ma paie. » Les montants de paie ne changent pas.
+
+- L'onglet « Pointer » devient « Mes heures ». Le chronomètre, les boutons Début / Pause / Fin, le GPS et le pointage en direct disparaissent de l'écran.
+- Ma journée : jour, arrivée, départ, pause, total, puis un seul bouton « Enregistrer ma journée ». Les heures se choisissent dans des listes en 24 h (plus de « AM / PM », quel que soit le téléphone). Le jour se choisit dans une liste en français (« Aujourd'hui », « Hier »…).
+- Ma semaine : du lundi au dimanche, total et heures sup, avec les semaines précédentes.
+- Mes journées : l'historique. Modifier ou supprimer une journée demande un motif. L'ancienne version reste, barrée, dans le journal scellé.
+- Les anciens pointages en direct restent lus. Une journée incomplète (départ manquant) est signalée et se complète depuis le formulaire.
+
 ## 0.2.0 — 2026-11-10
 
 Plus simple au quotidien. Les montants de paie ne changent pas.

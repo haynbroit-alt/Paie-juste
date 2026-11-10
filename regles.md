@@ -87,7 +87,8 @@ Source : [règlement (UE) 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/o
 
 - La paie ne dépend que des **durées** par jour et par semaine (`minutesByDay`, `splitWeekly`). Saisir « début, fin, pause » donne donc les mêmes montants que quatre pointages en direct.
 - L'heure exacte de la pause n'est pas demandée : elle est placée au milieu du temps de travail, et le motif scellé le dit (« heure de la pause non précisée »).
-- **Non couvert** : une journée qui passe minuit (travail de nuit). Elle se pointe en direct.
+- **Non couvert** : une journée qui passe minuit (travail de nuit). Depuis la 0.3.0, le pointage en direct n'est plus à l'écran : une telle journée se note en deux jours (avant et après minuit).
+- Modifier une journée = annuler ses pointages (correction scellée avec motif) puis sceller la nouvelle version. Rien n'est effacé.
 - Les rappels passent par l'agenda du téléphone. Une appli web sans serveur ne peut pas programmer une notification fiable à heure fixe.
 
 ## 2. INCONNU — non codé en dur, à saisir à la main

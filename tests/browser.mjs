@@ -69,33 +69,45 @@ console.log("=== Parcours réel (base vide) ===");
   await wait(500);
   await p.evaluate(() => window.__pj.go("pointer"));
   await wait(300);
-  t((await txt(p, "#b-main")).includes("DÉBUT"), "bouton DÉBUT");
-  await click(p, "#b-main");
-  await wait(600);
-  t((await txt(p, "#b-main")).includes("PAUSE"), "après Début → PAUSE");
-  t((await txt(p, ".clock")).toUpperCase().includes("AU TRAVAIL"), "état « Au travail »");
-  await click(p, "#b-main");
-  await wait(600);
-  t((await txt(p, "#b-main")).includes("REPRENDRE"), "après Pause → REPRENDRE");
-  await click(p, "#b-main");
-  await wait(600);
-  await click(p, "#b-fin");
-  await wait(600);
-  t((await txt(p, "#b-main")).includes("DÉBUT"), "après Fin → DÉBUT");
-  const n = await p.$$eval(".timeline li", (l) => l.length);
-  t(n === 4, "4 pointages dans la frise");
-  await p.$eval("[data-corr]", (b) => b.click());
+  t(
+    !(await p.$("#b-main")) && !(await p.$("#gps")) && !(await p.$(".clock")),
+    "plus de chronomètre, de bouton Début ni de GPS",
+  );
+  await p.select("#j-debut-h", "07");
+  await p.select("#j-debut-m", "30");
+  await p.select("#j-fin-h", "16");
+  await p.select("#j-fin-m", "30");
+  await p.select("#j-pause", "60");
+  t((await txt(p, "#j-total")).replace(/\s/g, "") === "8h00", "total travaillé : " + (await txt(p, "#j-total")));
+  await click(p, "#j-ok");
+  await wait(900);
+  const types = async () => p.evaluate(async () => (await window.__pj.store.all()).map((x) => x.type).join(","));
+  t(
+    (await types()) === "genesis,contrat,punch,punch,punch,punch",
+    "journée scellée en 4 pointages : " + (await types()),
+  );
+  t(!!(await p.$("#j-modif")), "journée notée : résumé avec bouton Modifier");
+  t((await txt(p, "#s-total")).replace(/\s/g, "") === "8h00", "Ma semaine : total " + (await txt(p, "#s-total")));
+  await click(p, "#j-modif");
   await wait(300);
-  await p.type("#c-motif", "test de correction");
-  await click(p, "#c-ok");
-  await wait(600);
-  t((await txt(p, ".timeline")).includes("corrigé"), "correction tracée (badge « corrigé »)");
+  await p.select("#j-fin-h", "17");
+  await p.select("#j-fin-m", "00");
+  await click(p, "#j-ok");
+  await wait(500);
+  t((await types()) === "genesis,contrat,punch,punch,punch,punch", "modification sans motif refusée");
+  await p.type("#j-motif", "parti à 17 h");
+  await click(p, "#j-ok");
+  await wait(1200);
+  t((await txt(p, "#s-total")).replace(/\s/g, "") === "8h30", "après modification : " + (await txt(p, "#s-total")));
+  await p.$eval("#historique", (d) => (d.open = true));
+  const hist = await txt(p, "#historique");
+  t(hist.includes("modifiée") && hist.includes("parti à 17 h"), "historique : journée « modifiée » avec le motif");
   t((await txt(p, "#seal-pill")).includes("✓"), "chaîne intacte : " + (await txt(p, "#seal-pill")));
-  const v = await p.evaluate(async () => {
-    const r = await window.__pj.store.all();
-    return r.map((x) => x.type).join(",");
-  });
-  t(v === "genesis,contrat,punch,punch,punch,punch,correction", "journal append-only : " + v);
+  const v = await types();
+  t(
+    v === "genesis,contrat,punch,punch,punch,punch,correction,correction,correction,correction,punch,punch,punch,punch",
+    "journal append-only (l'ancienne version reste) : " + v,
+  );
   // falsification dans IndexedDB → détectée
   const broken = await p.evaluate(async () => {
     const s = window.__pj.store;
@@ -178,10 +190,13 @@ t(
   "Réclamer : contacts vérifiés",
 );
 t(shots.contrat.includes("Intérim") && shots.contrat.includes("EXEMPLE"), "Contrat : fiche exemple");
-t(/AU TRAVAIL|PAS POINTÉ|EN PAUSE/.test(shots.pointer.toUpperCase()), "Pointer : état affiché");
+t(
+  shots.pointer.includes("Ma journée") && shots.pointer.includes("Ma semaine"),
+  "Mes heures : journée et semaine affichées",
+);
 
-// 2 bis. Saisie simple de la journée et rappels
-console.log("=== Ma journée en une fois ===");
+// 2 bis. Autre jour, rappels, accès au salaire
+console.log("=== Mes heures : autre jour et rappels ===");
 {
   const p = await newPage();
   await p.goto(BASE + "?nosw", { waitUntil: "networkidle0" });
@@ -194,46 +209,21 @@ console.log("=== Ma journée en une fois ===");
   await wait(500);
   await p.evaluate(() => window.__pj.go("pointer"));
   await wait(300);
-  t(!!(await p.$("#journee")), "carte « Ma journée » affichée");
-  const hier = await p.evaluate(() => {
-    const d = new Date(Date.now() - 864e5);
-    return d.toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
-  });
-  await p.$eval(
-    "#j-date",
-    (e, v) => {
-      e.value = v;
-      e.dispatchEvent(new Event("input"));
-    },
-    hier,
+  const hier = await p.evaluate(() =>
+    new Date(Date.now() - 864e5).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }),
   );
-  await p.$eval("#j-debut", (e) => {
-    e.value = "07:30";
-    e.dispatchEvent(new Event("input"));
-  });
-  await p.$eval("#j-fin", (e) => {
-    e.value = "16:30";
-    e.dispatchEvent(new Event("input"));
-  });
-  await p.select("#j-pause", "60");
-  await p.$eval("#j-pause", (e) => e.dispatchEvent(new Event("input")));
-  t((await txt(p, "#j-total")).replace(/\s/g, "").startsWith("8"), "total affiché : " + (await txt(p, "#j-total")));
+  await p.select("#j-date", hier);
+  await wait(400);
+  t((await p.$eval("#j-date", (s) => s.value)) === hier, "choix du jour : hier");
+  t((await p.$eval("#j-date", (s) => s.options[1].text)) === "Hier", "liste des jours en français (« Hier »)");
   await click(p, "#j-ok");
   await wait(900);
-  const types = await p.evaluate(async () => (await window.__pj.store.all()).map((x) => x.type).join(","));
-  t(types === "genesis,contrat,punch,punch,punch,punch", "4 pointages scellés : " + types);
-  t((await txt(p, ".timeline")).includes("journée saisie"), "pointages marqués « journée saisie »");
-  await p.$eval(
-    "#j-date",
-    (e, v) => {
-      e.value = v;
-      e.dispatchEvent(new Event("input"));
-    },
-    hier,
-  );
-  t(await p.$eval("#j-ok", (b) => b.disabled), "même jour une 2e fois : bouton désactivé");
+  t(!!(await p.$("#j-modif")), "hier noté");
   const href = await p.$eval("#r-soir", (a) => a.href);
   t(href.startsWith("https://calendar.google.com/") && href.includes("FREQ%3DWEEKLY"), "lien de rappel Google Agenda");
+  await click(p, "#j-autre");
+  await wait(400);
+  t((await p.$eval("#j-date", (s) => s.value)) !== hier, "« Noter un autre jour » propose un jour libre");
   await p.screenshot({ path: `${OUT}/1b-ma-journee.png`, fullPage: true });
   await click(p, "#go-paie");
   await wait(500);

@@ -1,7 +1,7 @@
 # Paie Juste
 
 Paie Juste est une application installable, hors ligne, pour les salariés du privé (CDI, CDD, intérim, temps partiel).
-Elle sert à pointer ses heures, estimer la paie due selon le droit du travail français, la comparer au bulletin, et préparer une lettre de réclamation.
+Elle sert à noter ses heures, estimer la paie due selon le droit du travail français, la comparer au bulletin, et préparer une lettre de réclamation.
 Chaque saisie est scellée dans une chaîne d'empreintes SHA-256. Pas de compte, pas de serveur.
 
 **Application :** [https://haynbroit-alt.github.io/Paie-juste/](https://haynbroit-alt.github.io/Paie-juste/)
@@ -28,9 +28,9 @@ Les règles retenues, leurs sources et leurs limites sont dans [regles.md](regle
 
 Captures du mode EXEMPLE, données fictives.
 
-![Pointer : heures en cours](captures/1-pointer.png)
+![Mes heures : ma journée et ma semaine](captures/1-pointer.png)
 
-![Ma journée : début, fin, pause en une fois](captures/1b-ma-journee.png)
+![Mes heures : semaine et historique](captures/1b-ma-journee.png)
 
 ![Ma paie : écart estimé avec le bulletin](captures/2-ma-paie.png)
 

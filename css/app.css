@@ -971,3 +971,79 @@ table.calc.cmp th.r {
 .scroll-x {
   overflow-x: auto;
 }
+
+/* Mes heures : saisie de la journée, semaine, historique */
+.lbl {
+  display: block;
+  font-weight: 800;
+  margin: 0.85rem 0 0.35rem;
+  font-size: 0.95rem;
+}
+.hm {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 0.35rem;
+}
+.hm select {
+  padding: 0.6rem 0.4rem;
+  text-align: center;
+}
+.total-jour {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 1rem 0 0.6rem;
+  padding: 0.8rem 1rem;
+  background: var(--card2);
+  border-radius: 14px;
+  font-weight: 800;
+}
+.total-jour b {
+  font-size: 1.8rem;
+  color: var(--amber);
+}
+.btn.big {
+  min-height: 72px;
+  font-size: 1.15rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
+.fait {
+  font-size: 1.1rem;
+  margin: 0.4rem 0;
+}
+table.semaine {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.6rem;
+  font-size: 1.08rem;
+}
+table.semaine td {
+  padding: 0.7rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+table.semaine td.r {
+  text-align: right;
+  font-weight: 800;
+}
+table.semaine tr.auj td {
+  color: var(--amber);
+}
+table.semaine tr.tot td {
+  font-weight: 950;
+  font-size: 1.2rem;
+  border-bottom: 0;
+}
+ul.jours {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+ul.jours li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}

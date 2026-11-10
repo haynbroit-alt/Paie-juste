@@ -1,6 +1,7 @@
 // @ts-check
 /** Saisie simple d'une journée et rappels d'agenda. Pur : pas de DOM, testable dans Node. */
-import { parisLocalToIso } from "./util.js";
+import { parisLocalToIso, isoToParisLocal } from "./util.js";
+import { parisDate, workIntervals, intervalMinutes } from "./calc.js";
 
 /** @param {string} hhmm */
 const toMin = (hhmm) => {
@@ -31,7 +32,7 @@ export function journeePunches(j) {
     return {
       ok: false,
       erreur:
-        "L'heure de fin doit être après l'heure de début (le travail de nuit sur deux jours se pointe en direct).",
+        "L'heure de fin doit être après l'heure de début (une nuit qui passe minuit se note en deux jours : avant et après minuit).",
     };
   }
   const travail = f - d - p;
@@ -141,4 +142,68 @@ export function rappelsParDefaut(o) {
       rrule: "FREQ=MONTHLY;BYMONTHDAY=-1",
     },
   ];
+}
+
+/** @param {string} iso */
+const heureParis = (iso) => isoToParisLocal(iso).slice(11, 16);
+
+/**
+ * Résume les pointages d'un contrat, jour par jour : arrivée, départ, pause, total.
+ * Fonctionne aussi pour les anciens pointages faits en direct.
+ * @param {Array<Record<string, any>>} punches pointages non annulés, triés par heure
+ * @param {Array<Record<string, any>>} [tous] tous les pointages, annulés compris (pour la trace des modifications)
+ */
+export function resumeJournees(punches, tous = punches) {
+  /** @type {Map<string, Array<Record<string, any>>>} */
+  const parJour = new Map();
+  for (const p of punches) {
+    const d = parisDate(p.at);
+    parJour.set(d, [...(parJour.get(d) || []), p]);
+  }
+  /** @type {Map<string, Array<Record<string, any>>>} */
+  const traces = new Map();
+  for (const p of tous) {
+    if (!p.annule && !(p.corrections && p.corrections.length)) continue;
+    const d = parisDate(p.original ? p.original.at : p.at);
+    traces.set(d, [...(traces.get(d) || []), p]);
+  }
+  const jours = new Set([...parJour.keys(), ...traces.keys()]);
+  return [...jours]
+    .sort()
+    .reverse()
+    .map((date) => {
+      const ps = parJour.get(date) || [];
+      const w = workIntervals(ps);
+      const minutes = w.intervals.reduce((a, i) => a + intervalMinutes(i), 0);
+      const debut = ps.find((p) => p.action === "debut");
+      const fin = [...ps].reverse().find((p) => p.action === "fin");
+      const amplitude = debut && fin ? intervalMinutes({ start: debut.at, end: fin.at }) : 0;
+      const modifs = (traces.get(date) || []).flatMap((p) =>
+        (p.corrections || []).map((/** @type {any} */ c) => c.motif),
+      );
+      return {
+        date,
+        arrivee: debut ? heureParis(debut.at) : "",
+        depart: fin ? heureParis(fin.at) : "",
+        pauseMin: debut && fin ? Math.max(0, amplitude - minutes) : 0,
+        minutes,
+        aVerifier: w.anomalies.length > 0 || !debut || !fin,
+        supprimee: ps.length === 0,
+        modifiee: modifs.length > 0,
+        motifs: [...new Set(modifs.filter(Boolean))],
+        ids: ps.map((p) => p.id),
+      };
+    });
+}
+
+/** Lundi → dimanche de la semaine qui contient `date`. @param {string} lundi AAAA-MM-JJ (un lundi) */
+export function joursDeSemaine(lundi) {
+  const [y, m, d] = lundi.split("-").map(Number);
+  return Array.from({ length: 7 }, (_, k) => new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10));
+}
+
+/** Les `n` derniers jours, du plus récent au plus ancien. @param {string} today @param {number} n */
+export function joursRecents(today, n) {
+  const [y, m, d] = today.split("-").map(Number);
+  return Array.from({ length: n }, (_, k) => new Date(Date.UTC(y, m - 1, d - k)).toISOString().slice(0, 10));
 }
