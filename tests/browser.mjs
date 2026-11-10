@@ -8,15 +8,27 @@ const OUT = process.env.PJ_CAPTURES
   : path.resolve(new URL(".", import.meta.url).pathname, "../captures");
 const FIX = path.resolve(new URL(".", import.meta.url).pathname, "fixtures");
 fs.mkdirSync(OUT, { recursive: true });
-let ok = 0, ko = 0;
+let ok = 0,
+  ko = 0;
 const t = (c, m) => (c ? (ok++, console.log("  OK   " + m)) : (ko++, console.error("  FAIL " + m)));
-const chromeCandidates = [process.env.CHROME_PATH, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/local/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].filter(Boolean);
+const chromeCandidates = [
+  process.env.CHROME_PATH,
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/local/bin/google-chrome",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+].filter(Boolean);
 const executablePath = chromeCandidates.find((p) => fs.existsSync(p));
 if (!executablePath) {
   console.error("Chrome introuvable. Installez google-chrome ou définissez CHROME_PATH.");
   process.exit(1);
 }
-const browser = await puppeteer.launch({ executablePath, headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", "--lang=fr-FR"] });
+const browser = await puppeteer.launch({
+  executablePath,
+  headless: true,
+  args: ["--no-sandbox", "--disable-dev-shm-usage", "--lang=fr-FR"],
+});
 const errors = [];
 const external = [];
 async function newPage() {
@@ -24,123 +36,222 @@ async function newPage() {
   const p = await ctx.newPage();
   await p.emulateTimezone("Europe/Paris");
   await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-  p.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  p.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
   p.on("pageerror", (e) => errors.push(String(e)));
-  p.on("request", (r) => { const u = new URL(r.url()); if (!["127.0.0.1", "localhost"].includes(u.hostname) && !["data:", "blob:", "file:"].includes(u.protocol)) external.push(r.url()); });
+  p.on("request", (r) => {
+    const u = new URL(r.url());
+    if (!["127.0.0.1", "localhost"].includes(u.hostname) && !["data:", "blob:", "file:"].includes(u.protocol))
+      external.push(r.url());
+  });
   return p;
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const txt = (p, sel) => p.$eval(sel, (e) => e.innerText);
-const click = async (p, sel) => { await p.$eval(sel, (e) => e.click()); await wait(350); };
+const click = async (p, sel) => {
+  await p.$eval(sel, (e) => e.click());
+  await wait(350);
+};
 
 // 1. Parcours réel : contrat → pointages → correction → paie
 console.log("=== Parcours réel (base vide) ===");
-{ const p = await newPage();
+{
+  const p = await newPage();
   await p.goto(BASE + "?nosw", { waitUntil: "networkidle0" });
   t((await txt(p, "main")).includes("Bienvenue"), "écran d'accueil sans contrat");
   await click(p, "#go-c");
-  await p.select("#f-type", "cdi"); await wait(300);
-  await p.type("#f-taux", "12"); await p.type("#f-employeur", "Test SARL");
-  await click(p, "#f-save"); await wait(500);
-  await p.evaluate(() => window.__pj.go("pointer")); await wait(300);
+  await p.select("#f-type", "cdi");
+  await wait(300);
+  await p.type("#f-taux", "12");
+  await p.type("#f-employeur", "Test SARL");
+  await click(p, "#f-save");
+  await wait(500);
+  await p.evaluate(() => window.__pj.go("pointer"));
+  await wait(300);
   t((await txt(p, "#b-main")).includes("DÉBUT"), "bouton DÉBUT");
-  await click(p, "#b-main"); await wait(600);
+  await click(p, "#b-main");
+  await wait(600);
   t((await txt(p, "#b-main")).includes("PAUSE"), "après Début → PAUSE");
   t((await txt(p, ".clock")).toUpperCase().includes("AU TRAVAIL"), "état « Au travail »");
-  await click(p, "#b-main"); await wait(600);
+  await click(p, "#b-main");
+  await wait(600);
   t((await txt(p, "#b-main")).includes("REPRENDRE"), "après Pause → REPRENDRE");
-  await click(p, "#b-main"); await wait(600);
-  await click(p, "#b-fin"); await wait(600);
+  await click(p, "#b-main");
+  await wait(600);
+  await click(p, "#b-fin");
+  await wait(600);
   t((await txt(p, "#b-main")).includes("DÉBUT"), "après Fin → DÉBUT");
-  const n = await p.$$eval(".timeline li", (l) => l.length); t(n === 4, "4 pointages dans la frise");
-  await p.$eval("[data-corr]", (b) => b.click()); await wait(300);
-  await p.type("#c-motif", "test de correction"); await click(p, "#c-ok"); await wait(600);
+  const n = await p.$$eval(".timeline li", (l) => l.length);
+  t(n === 4, "4 pointages dans la frise");
+  await p.$eval("[data-corr]", (b) => b.click());
+  await wait(300);
+  await p.type("#c-motif", "test de correction");
+  await click(p, "#c-ok");
+  await wait(600);
   t((await txt(p, ".timeline")).includes("corrigé"), "correction tracée (badge « corrigé »)");
   t((await txt(p, "#seal-pill")).includes("✓"), "chaîne intacte : " + (await txt(p, "#seal-pill")));
-  const v = await p.evaluate(async () => { const r = await window.__pj.store.all(); return r.map((x) => x.type).join(","); });
+  const v = await p.evaluate(async () => {
+    const r = await window.__pj.store.all();
+    return r.map((x) => x.type).join(",");
+  });
   t(v === "genesis,contrat,punch,punch,punch,punch,correction", "journal append-only : " + v);
   // falsification dans IndexedDB → détectée
   const broken = await p.evaluate(async () => {
-    const s = window.__pj.store; const all = await s.all(); const rec = { ...all[2], data: { ...all[2].data, at: "2020-01-01T00:00:00.000Z" } };
-    await new Promise((res) => { const tx = s.db.transaction("records", "readwrite"); tx.objectStore("records").put(rec); tx.oncomplete = res; });
-    s._cache = null; await window.__pj.refresh(); return document.querySelector("#seal-pill").innerText;
+    const s = window.__pj.store;
+    const all = await s.all();
+    const rec = { ...all[2], data: { ...all[2].data, at: "2020-01-01T00:00:00.000Z" } };
+    await new Promise((res) => {
+      const tx = s.db.transaction("records", "readwrite");
+      tx.objectStore("records").put(rec);
+      tx.oncomplete = res;
+    });
+    s._cache = null;
+    await window.__pj.refresh();
+    return document.querySelector("#seal-pill").innerText;
   });
   t(broken.includes("rompue"), "falsification détectée : " + broken);
-  await p.close(); }
+  await p.close();
+}
 
 // 2. Démo + captures
 console.log("=== Mode EXEMPLE + captures ===");
 const shots = {};
-for (const [tab, file] of [["pointer", "1-pointer"], ["paie", "2-ma-paie"], ["reclamer", "3-reclamer"], ["contrat", "4-contrat"]]) {
+for (const [tab, file] of [
+  ["pointer", "1-pointer"],
+  ["paie", "2-ma-paie"],
+  ["reclamer", "3-reclamer"],
+  ["contrat", "4-contrat"],
+]) {
   const p = await newPage();
-  await p.goto(BASE + `?nosw&exemple=1&onglet=${tab}`, { waitUntil: "networkidle0" }); await wait(1200);
+  await p.goto(BASE + `?nosw&exemple=1&onglet=${tab}`, { waitUntil: "networkidle0" });
+  await wait(1200);
   t(await p.$eval("body", (b) => b.classList.contains("demo")), `${tab} : bandeau EXEMPLE`);
   await p.screenshot({ path: `${OUT}/${file}.png` });
-  t(await p.evaluate(() => document.documentElement.scrollWidth) <= 390, `${tab} : pas de débordement horizontal à 390 px`);
-  await p.addStyleTag({ content: "nav.tabs,header.top{position:static!important}" });
+  const sw = await p.evaluate(() => document.documentElement.scrollWidth);
+  t(sw <= 390, `${tab} : pas de débordement horizontal à 390 px (scrollWidth ${sw})`);
   await p.screenshot({ path: `${OUT}/${file}-page-entiere.png`, fullPage: true });
-  if (tab === "paie") { await p.evaluate(() => document.querySelector("#net-decompte").scrollIntoView({ block: "center" })); await wait(300); await p.screenshot({ path: `${OUT}/2c-ma-paie-net-verse.png` }); }
+  if (tab === "paie") {
+    await p.evaluate(() => document.querySelector("#net-decompte").scrollIntoView({ block: "center" }));
+    await wait(300);
+    await p.screenshot({ path: `${OUT}/2c-ma-paie-net-verse.png` });
+  }
   shots[tab] = await txt(p, "main");
   await p.close();
 }
-{ const p = await newPage();
-  await p.goto(BASE + "?nosw&exemple=1&onglet=paie&periode=" + new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7), { waitUntil: "networkidle0" }); await wait(1200);
-  const m = await txt(p, "main"); t(m.includes("Ce que vous allez toucher ce mois"), "Ma paie (mois en cours) : prévision brut → net");
+{
+  const p = await newPage();
+  await p.goto(
+    BASE +
+      "?nosw&exemple=1&onglet=paie&periode=" +
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit" })
+        .format(new Date())
+        .slice(0, 7),
+    { waitUntil: "networkidle0" },
+  );
+  await wait(1200);
+  const m = await txt(p, "main");
+  t(m.includes("Ce que vous allez toucher ce mois"), "Ma paie (mois en cours) : prévision brut → net");
   t(!m.includes("vous doit"), "sans bulletin du mois : pas de « vous doit »");
-  await p.screenshot({ path: `${OUT}/2b-ma-paie-prevision-mois.png` }); await p.close(); }
-t(shots.paie.includes("L'agence vous doit") && shots.paie.includes("382,60"), "Ma paie : « L'agence vous doit 382,60 € »");
+  await p.screenshot({ path: `${OUT}/2b-ma-paie-prevision-mois.png` });
+  await p.close();
+}
+t(
+  shots.paie.includes("L'agence vous doit") && shots.paie.includes("382,60"),
+  "Ma paie : « L'agence vous doit 382,60 € »",
+);
 t(shots.paie.includes("estimation"), "Ma paie : mention estimation");
-t(/\+ Indemnités non soumises[\s\S]*Panier[\s\S]*\+220,00 €[\s\S]*= Net versé\s+2 651,98 €/.test(shots.paie), "Ma paie : ligne « + indemnités non soumises » visible entre net avant impôt et net versé");
-t(/Net avant impôt\s+2 431,98 €/.test(shots.paie) && shots.paie.includes("2 989,31 €"), "Ma paie : net avant impôt 2 431,98 € et brut 2 989,31 €");
-t(shots.reclamer.includes("pas un conseil juridique") || shots.reclamer.includes("n'est pas un conseil juridique"), "Réclamer : mention pas un conseil juridique");
-t(shots.reclamer.includes("0 806 000 126") && shots.reclamer.includes("9 rue de Tarragone"), "Réclamer : contacts vérifiés");
+t(
+  /\+ Indemnités non soumises[\s\S]*Panier[\s\S]*\+220,00 €[\s\S]*= Net versé\s+2 651,98 €/.test(shots.paie),
+  "Ma paie : ligne « + indemnités non soumises » visible entre net avant impôt et net versé",
+);
+t(
+  /Net avant impôt\s+2 431,98 €/.test(shots.paie) && shots.paie.includes("2 989,31 €"),
+  "Ma paie : net avant impôt 2 431,98 € et brut 2 989,31 €",
+);
+t(
+  shots.reclamer.includes("pas un conseil juridique") || shots.reclamer.includes("n'est pas un conseil juridique"),
+  "Réclamer : mention pas un conseil juridique",
+);
+t(
+  shots.reclamer.includes("0 806 000 126") && shots.reclamer.includes("9 rue de Tarragone"),
+  "Réclamer : contacts vérifiés",
+);
 t(shots.contrat.includes("Intérim") && shots.contrat.includes("EXEMPLE"), "Contrat : fiche exemple");
 t(/AU TRAVAIL|PAS POINTÉ|EN PAUSE/.test(shots.pointer.toUpperCase()), "Pointer : état affiché");
 
 // 3. Mise en demeure + impression
-{ const p = await newPage();
-  await p.goto(BASE + "?nosw&exemple=1&onglet=reclamer", { waitUntil: "networkidle0" }); await wait(800);
+{
+  const p = await newPage();
+  await p.goto(BASE + "?nosw&exemple=1&onglet=reclamer", { waitUntil: "networkidle0" });
+  await wait(800);
   await click(p, '[data-t="med"]');
   const paper = await txt(p, "#paper");
-  t(paper.includes("mise en demeure") && paper.includes("L1251-32") && paper.includes("382,60"), "mise en demeure chiffrée avec articles");
-  await wait(700); await p.screenshot({ path: `${OUT}/3b-mise-en-demeure.png` });
-  await p.evaluate(() => { window.print = () => {}; }); await click(p, "#r-print");
+  t(
+    paper.includes("mise en demeure") && paper.includes("L1251-32") && paper.includes("382,60"),
+    "mise en demeure chiffrée avec articles",
+  );
+  await wait(700);
+  await p.screenshot({ path: `${OUT}/3b-mise-en-demeure.png` });
+  await p.evaluate(() => {
+    window.print = () => {};
+  });
+  await click(p, "#r-print");
   const pa = await p.$eval("#print-area", (e) => e.innerText);
   t(pa.includes("ANNEXE") && pa.includes("SHA-256"), "impression : courrier + annexe relevé scellé");
   await p.emulateMediaType("print");
-  await p.pdf({ path: `${OUT}/exemple-mise-en-demeure.pdf`, format: "A4", margin: { top: "18mm", bottom: "18mm", left: "16mm", right: "16mm" } });
-  await p.close(); }
+  await p.pdf({
+    path: `${OUT}/exemple-mise-en-demeure.pdf`,
+    format: "A4",
+    margin: { top: "18mm", bottom: "18mm", left: "16mm", right: "16mm" },
+  });
+  await p.close();
+}
 
 // 4. Import automatique de contrat : PDF texte (pdf.js) et photo (OCR)
 console.log("=== Import de contrat (local) ===");
-{ const gen = await newPage();
+{
+  const gen = await newPage();
   await gen.goto("file://" + FIX + "/contrat-texte.html");
-  await gen.pdf({ path: FIX + "/contrat-texte.pdf", format: "A4" }); await gen.close();
+  await gen.pdf({ path: FIX + "/contrat-texte.pdf", format: "A4" });
+  await gen.close();
   const p = await newPage();
-  await p.goto(BASE + "?nosw&onglet=contrat", { waitUntil: "networkidle0" }); await wait(500);
-  let input = await p.$("#imp-file"); await input.uploadFile(FIX + "/contrat-texte.pdf");
+  await p.goto(BASE + "?nosw&onglet=contrat", { waitUntil: "networkidle0" });
+  await wait(500);
+  let input = await p.$("#imp-file");
+  await input.uploadFile(FIX + "/contrat-texte.pdf");
   await p.waitForSelector("#imp-apply", { timeout: 30000 }).catch(() => {});
   let body = await txt(p, "main");
-  t(body.includes("13,80") && body.includes("Intérim Exemple Sud") && body.includes("39"), "PDF : taux, agence, 39 h proposés");
-  await wait(700); await p.screenshot({ path: `${OUT}/4b-contrat-import-pdf.png`, fullPage: false });
+  t(
+    body.includes("13,80") && body.includes("Intérim Exemple Sud") && body.includes("39"),
+    "PDF : taux, agence, 39 h proposés",
+  );
+  await wait(700);
+  await p.screenshot({ path: `${OUT}/4b-contrat-import-pdf.png`, fullPage: false });
   await click(p, "#imp-apply");
-  t(await p.$eval("#f-taux", (e) => e.value) === "13.8", "PDF : formulaire pré-rempli, à valider");
+  t((await p.$eval("#f-taux", (e) => e.value)) === "13.8", "PDF : formulaire pré-rempli, à valider");
   // photo
   const t0 = Date.now();
-  input = await p.$("#imp-file"); await input.uploadFile(FIX + "/contrat-photo.png");
+  input = await p.$("#imp-file");
+  await input.uploadFile(FIX + "/contrat-photo.png");
   await p.waitForSelector("#imp-apply", { timeout: 120000 }).catch(() => {});
   body = await txt(p, "main");
   const ocrOk = body.includes("13,20") && /Menuiserie/i.test(body);
   t(ocrOk, `photo (OCR fra local, ${Math.round((Date.now() - t0) / 1000)} s) : taux 13,20 et employeur reconnus`);
   if (!ocrOk) console.log(body.slice(0, 1500));
   t((body.match(/CDD/) || []).length > 0, "photo : type CDD reconnu");
-  await wait(700); await p.screenshot({ path: `${OUT}/4c-contrat-import-photo.png` });
-  await p.close(); }
+  await wait(700);
+  await p.screenshot({ path: `${OUT}/4c-contrat-import-photo.png` });
+  await p.close();
+}
 
 console.log("=== Service worker et manifeste (sous-chemin) ===");
 {
   const p = await newPage();
-  const basePath = (() => { const u = new URL(BASE); return u.pathname.endsWith("/") ? u.pathname : u.pathname + "/"; })();
+  const basePath = (() => {
+    const u = new URL(BASE);
+    return u.pathname.endsWith("/") ? u.pathname : u.pathname + "/";
+  })();
   await p.goto(BASE, { waitUntil: "load" });
   let info = null;
   try {
@@ -157,10 +268,14 @@ console.log("=== Service worker et manifeste (sous-chemin) ===");
       let swError = null;
       let reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
-        try { reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" }); }
-        catch (e) { swError = String(e && (e.message || e)); }
+        try {
+          reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+        } catch (e) {
+          swError = String(e && (e.message || e));
+        }
       }
-      let scope = null, script = null;
+      let scope = null,
+        script = null;
       if (!swError) {
         try {
           const ready = await Promise.race([
@@ -169,26 +284,76 @@ console.log("=== Service worker et manifeste (sous-chemin) ===");
           ]);
           scope = ready.scope;
           script = ready.active && ready.active.scriptURL;
-        } catch (e) { swError = String(e && (e.message || e)); }
+        } catch (e) {
+          swError = String(e && (e.message || e));
+        }
       }
       return {
         manifestStatus: manRes.status,
         start: abs(manifest.start_url || "./"),
         scopeUrl: abs(manifest.scope || "./"),
-        iconChecks, swError, scope, script,
+        iconChecks,
+        swError,
+        scope,
+        script,
       };
     });
-  } catch (e) { t(false, "service worker / manifeste : " + e); }
+  } catch (e) {
+    t(false, "service worker / manifeste : " + e);
+  }
   if (info) {
     t(info.manifestStatus === 200, "manifest.json chargé");
     t(new URL(info.start).pathname.startsWith(basePath), "start_url dans le dossier de l'appli : " + info.start);
     t(new URL(info.scopeUrl).pathname === basePath, "scope du manifeste = dossier de l'appli : " + info.scopeUrl);
     t(!info.swError, "service worker enregistré" + (info.swError ? " : " + info.swError : ""));
     if (info.scope) t(new URL(info.scope).pathname === basePath, "scope du service worker : " + info.scope);
-    if (info.script) t(new URL(info.script).pathname === basePath + "sw.js", "script du service worker : " + info.script);
+    if (info.script)
+      t(new URL(info.script).pathname === basePath + "sw.js", "script du service worker : " + info.script);
     t(info.iconChecks.length >= 2 && info.iconChecks.every((i) => i.status === 200), "icônes du manifeste accessibles");
   }
   await p.close();
+}
+{
+  const fresh = await newPage();
+  await fresh.goto(BASE + (BASE.includes("?") ? "&" : "?") + "nosw", { waitUntil: "load" });
+  const updated = await fresh.evaluate(async () => {
+    const staleName = "paie-juste-v0-test-stale";
+    const stale = await caches.open(staleName);
+    await stale.put(new Request(new URL("./stale-test", location.href)), new Response("stale"));
+    await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+    await navigator.serviceWorker.ready;
+    let keys = await caches.keys();
+    const start = Date.now();
+    while (keys.includes(staleName) && Date.now() - start < 3000) {
+      await new Promise((r) => setTimeout(r, 50));
+      keys = await caches.keys();
+    }
+    const hit = await caches.match(new URL("./index.html", location.href).href);
+    return { keys, hasIndex: !!hit };
+  });
+  t(updated && !updated.keys.includes("paie-juste-v0-test-stale"), "activation : ancien cache supprimé");
+  t(
+    updated && updated.keys.some((k) => k.startsWith("paie-juste-v")),
+    "cache versionné : " + (updated ? updated.keys.join(", ") : ""),
+  );
+  t(updated && updated.hasIndex, "précache : index.html présent après installation");
+  await fresh.close();
+}
+{
+  const live = await browser.newPage();
+  await live.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await live.goto(BASE, { waitUntil: "load" });
+  await live.evaluate(() => navigator.serviceWorker.ready);
+  const cdp = await live.createCDPSession();
+  const inst = await cdp
+    .send("Page.getInstallabilityErrors")
+    .catch((e) => ({ installabilityErrors: [{ errorId: String(e) }] }));
+  const installErrors = inst.installabilityErrors || [];
+  t(
+    installErrors.length === 0,
+    "PWA installable" + (installErrors.length ? " : " + JSON.stringify(installErrors) : ""),
+  );
+  await live.close();
 }
 
 t(external.length === 0, "aucune requête hors de l'appli" + (external.length ? " : " + external.join(", ") : ""));

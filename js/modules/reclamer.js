@@ -12,10 +12,21 @@ export function buildContext(ctx) {
   if (!R) return null;
   const { P, periode } = R;
   const inPeriod = (iso) => periode === "contrat" || parisDate(iso).slice(0, 7) === periode;
-  const punches = ctx.state.allPunches.filter((p) => p.contratId === P.contrat.id && inPeriod(p.at)).sort((a, b) => (a.at < b.at ? -1 : 1)).map((p) => {
-    const corr = p.corrections[p.corrections.length - 1];
-    return { quand: fmtParis(p.at, { year: true }), action: ACTIONS[p.action], contrat: P.contrat.lieu || P.contrat.employeur, corrige: !!corr && !p.annule, annule: p.annule, motif: corr ? corr.motif + " (origine " + fmtParis(p.original.at) + ")" : "", hash: p.hash };
-  });
+  const punches = ctx.state.allPunches
+    .filter((p) => p.contratId === P.contrat.id && inPeriod(p.at))
+    .sort((a, b) => (a.at < b.at ? -1 : 1))
+    .map((p) => {
+      const corr = p.corrections[p.corrections.length - 1];
+      return {
+        quand: fmtParis(p.at, { year: true }),
+        action: ACTIONS[p.action],
+        contrat: P.contrat.lieu || P.contrat.employeur,
+        corrige: !!corr && !p.annule,
+        annule: p.annule,
+        motif: corr ? corr.motif + " (origine " + fmtParis(p.original.at) + ")" : "",
+        hash: p.hash,
+      };
+    });
   return {
     P,
     profil: ctx.meta.profil || {},
@@ -25,15 +36,26 @@ export function buildContext(ctx) {
     dateStr: new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }),
     amiableDate: ui.amiableDate ? new Date(ui.amiableDate + "T12:00:00Z").toLocaleDateString("fr-FR") : "",
     delaiJours: ui.delai,
-    annexe: { count: ctx.records.length, head: ctx.records[ctx.records.length - 1]?.hash, verif: ctx.verif?.ok ? "chaîne intacte (vérifiée le " + fmtParis(nowIso(), { year: true }) + ", heure de Paris)" : "ÉCHEC : chaîne rompue", punches },
+    annexe: {
+      count: ctx.records.length,
+      head: ctx.records[ctx.records.length - 1]?.hash,
+      verif: ctx.verif?.ok
+        ? "chaîne intacte (vérifiée le " + fmtParis(nowIso(), { year: true }) + ", heure de Paris)"
+        : "ÉCHEC : chaîne rompue",
+      punches,
+    },
   };
 }
 
 export default {
-  id: "reclamer", label: "Réclamer",
+  id: "reclamer",
+  label: "Réclamer",
   render(ctx, el) {
     const L = buildContext(ctx);
-    if (!L) { el.innerHTML = `<div class="card"><h2>Réclamer</h2><p>Ajoutez d'abord votre contrat et vos heures.</p></div>`; return; }
+    if (!L) {
+      el.innerHTML = `<div class="card"><h2>Réclamer</h2><p>Ajoutez d'abord votre contrat et vos heures.</p></div>`;
+      return;
+    }
     const txt = ui.type === "amiable" ? lettreAmiable(L) : ui.type === "med" ? miseEnDemeure(L) : annexeReleve(L);
     const p = L.profil;
     el.innerHTML = `${contratSelect(ctx)}
@@ -55,21 +77,56 @@ export default {
         <label for="pf-ville">Ville (pour « Fait à »)</label><input id="pf-ville" type="text" value="${esc(p.ville || "")}" placeholder="Montpellier">
         <button class="btn" id="pf-save">Enregistrer sur ce téléphone</button></details>
       <div class="card"><h3>Se faire aider (gratuit)</h3><p class="small muted">Pour tout salarié : CDI, CDD, intérim, temps partiel. Coordonnées vérifiées le 10/11/2026 sur les sites officiels.</p>
-        ${CONTACTS.map((c) => `<div class="contact"><b>${esc(c.nom)}</b><div class="small muted">${esc(c.role)}</div>${c.lignes.map((l) => `<div class="small">${esc(l)}</div>`).join("")}${c.telAff ? `<div class="small">${esc(c.telAff)}</div>` : ""}
-          <div class="actions">${c.tel ? `<a href="tel:${c.tel}">📞 Appeler</a>` : ""}${c.mail ? `<a href="mailto:${c.mail}">✉ ${esc(c.mail)}</a>` : ""}${c.lien ? `<a href="${c.lien}" target="_blank" rel="noopener">Ouvrir</a>` : ""}<a href="${c.source}" target="_blank" rel="noopener" class="dim">source</a></div></div>`).join("")}
+        ${CONTACTS.map(
+          (
+            c,
+          ) => `<div class="contact"><b>${esc(c.nom)}</b><div class="small muted">${esc(c.role)}</div>${c.lignes.map((l) => `<div class="small">${esc(l)}</div>`).join("")}${c.telAff ? `<div class="small">${esc(c.telAff)}</div>` : ""}
+          <div class="actions">${c.tel ? `<a href="tel:${c.tel}">📞 Appeler</a>` : ""}${c.mail ? `<a href="mailto:${c.mail}">✉ ${esc(c.mail)}</a>` : ""}${c.lien ? `<a href="${c.lien}" target="_blank" rel="noopener">Ouvrir</a>` : ""}<a href="${c.source}" target="_blank" rel="noopener" class="dim">source</a></div></div>`,
+        ).join("")}
         <p class="small dim">${esc(CONTACTS_NOTE)}</p></div>`;
     bindContratSelect(ctx, el);
-    el.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { ui.type = b.dataset.t; ctx.go("reclamer"); }));
-    const am = el.querySelector("#r-am"); if (am) am.onchange = () => { ui.amiableDate = am.value; ctx.go("reclamer"); };
-    const de = el.querySelector("#r-del"); if (de) de.onchange = () => { ui.delai = Number(de.value) || 15; ctx.go("reclamer"); };
+    el.querySelectorAll("[data-t]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          ui.type = b.dataset.t;
+          ctx.go("reclamer");
+        }),
+    );
+    const am = el.querySelector("#r-am");
+    if (am) {
+      am.onchange = () => {
+        ui.amiableDate = am.value;
+        ctx.go("reclamer");
+      };
+    }
+    const de = el.querySelector("#r-del");
+    if (de) {
+      de.onchange = () => {
+        ui.delai = Number(de.value) || 15;
+        ctx.go("reclamer");
+      };
+    }
     el.querySelector("#r-copy").onclick = async () => {
-      try { await navigator.clipboard.writeText(txt); ctx.toast("Courrier copié. Collez-le dans votre e-mail ou votre traitement de texte."); }
-      catch { const r = document.createRange(); r.selectNodeContents(el.querySelector("#paper")); getSelection().removeAllRanges(); getSelection().addRange(r); ctx.toast("Texte sélectionné : appuyez sur Copier.", true); }
+      try {
+        await navigator.clipboard.writeText(txt);
+        ctx.toast("Courrier copié. Collez-le dans votre e-mail ou votre traitement de texte.");
+      } catch {
+        const r = document.createRange();
+        r.selectNodeContents(el.querySelector("#paper"));
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+        ctx.toast("Texte sélectionné : appuyez sur Copier.", true);
+      }
     };
     el.querySelector("#r-print").onclick = () => ctx.print(ui.type === "annexe" ? txt : txt + "\f" + annexeReleve(L));
     el.querySelector("#pf-save").onclick = async () => {
-      await ctx.setMeta("profil", { nom: el.querySelector("#pf-nom").value.trim(), adresse: el.querySelector("#pf-adr").value.trim(), ville: el.querySelector("#pf-ville").value.trim() });
-      ctx.toast("Coordonnées enregistrées sur ce téléphone."); ctx.go("reclamer");
+      await ctx.setMeta("profil", {
+        nom: el.querySelector("#pf-nom").value.trim(),
+        adresse: el.querySelector("#pf-adr").value.trim(),
+        ville: el.querySelector("#pf-ville").value.trim(),
+      });
+      ctx.toast("Coordonnées enregistrées sur ce téléphone.");
+      ctx.go("reclamer");
     };
   },
 };

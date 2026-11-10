@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Chaînage d'intégrité SHA-256 (pas une blockchain, pas de crypto-monnaie).
  * Chaque enregistrement porte l'empreinte du précédent.
@@ -5,6 +6,7 @@
 export const GENESIS_HASH = "0".repeat(64);
 export const HASH_ALG = "SHA-256";
 
+/** @param {any} value @returns {string} */
 export function canonicalize(value) {
   if (value === null) return "null";
   if (typeof value === "number") {
@@ -32,9 +34,11 @@ function getSubtle() {
   return c.subtle;
 }
 
+/** @param {BufferSource} bytes */
 export async function sha256Hex(bytes) {
   const subtle = getSubtle();
-  const buf = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const buf =
+    bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const digest = await subtle.digest(HASH_ALG, buf);
   const arr = new Uint8Array(digest);
   let hex = "";
@@ -42,12 +46,15 @@ export async function sha256Hex(bytes) {
   return hex;
 }
 
+/** @param {string} text */
 export async function sha256Text(text) {
   return sha256Hex(new TextEncoder().encode(text));
 }
 
 /** Corps signé : tous les champs sauf `hash`. */
+/** @param {Record<string, any>} record */
 export function bodyForHash(record) {
+  /** @type {Record<string, any>} */
   const body = {};
   for (const [k, v] of Object.entries(record)) {
     if (k === "hash" || v === undefined) continue;
@@ -56,11 +63,14 @@ export function bodyForHash(record) {
   return body;
 }
 
+/** @param {Record<string, any>} record */
 export async function hashRecord(record) {
   return sha256Text(canonicalize(bodyForHash(record)));
 }
 
+/** @param {Record<string, any>} record @param {string} [prevHash] */
 export async function sealRecord(record, prevHash) {
+  /** @type {Record<string, any>} */
   const rec = { ...record, prevHash: prevHash || GENESIS_HASH };
   delete rec.hash;
   const hash = await hashRecord(rec);
@@ -72,6 +82,7 @@ export async function sealRecord(record, prevHash) {
  * Vérifie la chaîne dans l'ordre.
  * Retourne { ok, errors[], head }.
  */
+/** @param {Array<Record<string, any>>} records */
 export async function verifyChain(records) {
   const errors = [];
   if (!Array.isArray(records) || records.length === 0) {
@@ -87,24 +98,12 @@ export async function verifyChain(records) {
     }
     if (rec.prevHash !== expectedPrev) {
       errors.push(
-        "Rupture de chaîne au n° " +
-          (rec.seq ?? i) +
-          " : prevHash=" +
-          rec.prevHash +
-          " attendu=" +
-          expectedPrev
+        "Rupture de chaîne au n° " + (rec.seq ?? i) + " : prevHash=" + rec.prevHash + " attendu=" + expectedPrev,
       );
     }
     const computed = await hashRecord(rec);
     if (computed !== rec.hash) {
-      errors.push(
-        "Empreinte altérée au n° " +
-          (rec.seq ?? i) +
-          " : hash=" +
-          rec.hash +
-          " calculé=" +
-          computed
-      );
+      errors.push("Empreinte altérée au n° " + (rec.seq ?? i) + " : hash=" + rec.hash + " calculé=" + computed);
     }
     expectedPrev = rec.hash || computed;
     head = expectedPrev;

@@ -6,7 +6,8 @@ import { APP_VERSION } from "../version.js";
 const stamp = () => new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" }).replace(/[-: ]/g, "").slice(0, 12);
 
 export default {
-  id: "donnees", label: "Données",
+  id: "donnees",
+  label: "Données",
   render(ctx, el) {
     const v = ctx.verif || { ok: false, errors: [] };
     el.innerHTML = `<h2>Mes données</h2>
@@ -24,24 +25,48 @@ export default {
         <input id="d-wipe-t" type="text" placeholder="EFFACER" autocomplete="off"><button class="btn stop" id="d-wipe">Effacer définitivement</button></div>
       <p class="small dim">Paie Juste v${APP_VERSION} · licence MIT · fonctionne hors ligne · aucune donnée ne quitte ce téléphone (pas de compte, pas de serveur, pas de statistiques).<br>Bibliothèques embarquées : pdf.js et tesseract.js (Apache-2.0).</p>`;
     const name = (ext) => `paie-juste${ctx.demo ? "-EXEMPLE" : ""}-${stamp()}.${ext}`;
-    el.querySelector("#d-verify").onclick = async () => { const r = await verifyChain(ctx.records); el.querySelector("#d-res").textContent = r.ok ? `✓ Chaîne intacte : ${ctx.records.length} enregistrements.\nEmpreinte finale : ${r.head}` : "✗ " + r.errors.join("\n"); };
-    el.querySelector("#d-json").onclick = () => downloadBlob(name("json"), new Blob([JSON.stringify(buildExport(ctx.records, { exemple: ctx.demo }), null, 2)], { type: "application/json" }));
-    el.querySelector("#d-csv").onclick = () => downloadBlob(name("csv"), new Blob([buildCsv(ctx.records)], { type: "text/csv;charset=utf-8" }));
+    el.querySelector("#d-verify").onclick = async () => {
+      const r = await verifyChain(ctx.records);
+      el.querySelector("#d-res").textContent = r.ok
+        ? `✓ Chaîne intacte : ${ctx.records.length} enregistrements.\nEmpreinte finale : ${r.head}`
+        : "✗ " + r.errors.join("\n");
+    };
+    el.querySelector("#d-json").onclick = () =>
+      downloadBlob(
+        name("json"),
+        new Blob([JSON.stringify(buildExport(ctx.records, { exemple: ctx.demo }), null, 2)], {
+          type: "application/json",
+        }),
+      );
+    el.querySelector("#d-csv").onclick = () =>
+      downloadBlob(name("csv"), new Blob([buildCsv(ctx.records)], { type: "text/csv;charset=utf-8" }));
     el.querySelector("#d-file").onchange = async (e) => {
-      const f = e.target.files[0]; if (!f) return;
+      const f = e.target.files[0];
+      if (!f) return;
       const out = el.querySelector("#d-imp");
       try {
         const obj = JSON.parse(await f.text());
         const r = await checkImport(obj);
-        if (!r.ok) { out.textContent = "Import refusé : " + r.errors.slice(0, 3).join(" · "); return; }
-        if (!confirm(`Chaîne vérifiée (${obj.records.length} enregistrements). Remplacer les données actuelles ?`)) return;
-        await ctx.store.replaceAll(obj.records); ctx.toast("Sauvegarde importée."); ctx.refresh();
-      } catch (err) { out.textContent = "Fichier illisible : " + err.message; }
+        if (!r.ok) {
+          out.textContent = "Import refusé : " + r.errors.slice(0, 3).join(" · ");
+          return;
+        }
+        if (!confirm(`Chaîne vérifiée (${obj.records.length} enregistrements). Remplacer les données actuelles ?`)) {
+          return;
+        }
+        await ctx.store.replaceAll(obj.records);
+        ctx.toast("Sauvegarde importée.");
+        ctx.refresh();
+      } catch (err) {
+        out.textContent = "Fichier illisible : " + err.message;
+      }
     };
     el.querySelector("#d-demo").onclick = () => ctx.setDemo(!ctx.demo);
     el.querySelector("#d-wipe").onclick = async () => {
       if (el.querySelector("#d-wipe-t").value !== "EFFACER") return ctx.toast("Tapez EFFACER pour confirmer.", true);
-      await ctx.store.wipe(); ctx.toast("Données effacées."); ctx.refresh();
+      await ctx.store.wipe();
+      ctx.toast("Données effacées.");
+      ctx.refresh();
     };
   },
 };

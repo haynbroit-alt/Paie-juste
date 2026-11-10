@@ -1,0 +1,25 @@
+name: Dysfonctionnement
+description: Quelque chose ne s'affiche pas ou un montant semble faux
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que vous attendiez
+    validations:
+      required: true
+  - type: textarea
+    id: observe
+    attributes:
+      label: Ce qui se passe
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version et navigateur
+      placeholder: "0.1.1, Chrome Android"
+  - type: markdown
+    attributes:
+      value: "N'envoyez pas de bulletin réel ni de nom. Un exemple fictif suffit."

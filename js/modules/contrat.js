@@ -1,22 +1,70 @@
 import { TYPES, MOTIFS_FIN, DEFAULT_RULES, fmtEur, tauxHoraire } from "../calc.js";
 import { parseContrat } from "../contrat-parse.js";
-import { esc, fmtParis, nowIso, parisLocalToIso } from "../util.js";
+import { esc, fmtParis, parisLocalToIso } from "../util.js";
 import { contratSelect, bindContratSelect } from "./pointer.js";
 
 const ui = { editing: null, draft: null, proposals: null, rawText: "", progress: null, error: "" };
-const FIELDS = { type: "Type de contrat", mode: "Salaire", taux: "Taux horaire brut", mensuel: "Salaire mensuel brut", hebdo: "Heures par semaine", employeur: "Employeur / agence", eu: "Entreprise utilisatrice", lieu: "Lieu / chantier", poste: "Poste", convention: "Convention collective", dateDebut: "Début", dateFin: "Fin" };
-const showVal = (k, v) => (k === "type" ? TYPES[v]?.label : k === "mode" ? (v === "mensuel" ? "mensuel" : "à l'heure") : k === "taux" || k === "mensuel" ? fmtEur(v) : k === "hebdo" ? String(v).replace(".", ",") + " h" : v);
+const FIELDS = {
+  type: "Type de contrat",
+  mode: "Salaire",
+  taux: "Taux horaire brut",
+  mensuel: "Salaire mensuel brut",
+  hebdo: "Heures par semaine",
+  employeur: "Employeur / agence",
+  eu: "Entreprise utilisatrice",
+  lieu: "Lieu / chantier",
+  poste: "Poste",
+  convention: "Convention collective",
+  dateDebut: "Début",
+  dateFin: "Fin",
+};
+const showVal = (k, v) =>
+  k === "type"
+    ? TYPES[v]?.label
+    : k === "mode"
+      ? v === "mensuel"
+        ? "mensuel"
+        : "à l'heure"
+      : k === "taux" || k === "mensuel"
+        ? fmtEur(v)
+        : k === "hebdo"
+          ? String(v).replace(".", ",") + " h"
+          : v;
 
-function blankDraft() { return { type: "cdi", mode: "horaire", hebdo: 35, taux: "", mensuel: "", employeur: "", employeurAdresse: "", eu: "", tauxRef: "", lieu: "", poste: "", convention: "", dateDebut: "", dateFin: "", avantages: [], rules: {} }; }
-function draftFrom(c) { return { ...blankDraft(), ...c.raw, avantages: [...(c.raw.avantages || [])], rules: { ...(c.raw.rules || {}) } }; }
+function blankDraft() {
+  return {
+    type: "cdi",
+    mode: "horaire",
+    hebdo: 35,
+    taux: "",
+    mensuel: "",
+    employeur: "",
+    employeurAdresse: "",
+    eu: "",
+    tauxRef: "",
+    lieu: "",
+    poste: "",
+    convention: "",
+    dateDebut: "",
+    dateFin: "",
+    avantages: [],
+    rules: {},
+  };
+}
+function draftFrom(c) {
+  return { ...blankDraft(), ...c.raw, avantages: [...(c.raw.avantages || [])], rules: { ...(c.raw.rules || {}) } };
+}
 
-const pctIn = (id, label, val, def, art) => `<div><label for="${id}">${label} <span class="hint">(${art})</span></label><input id="${id}" type="number" inputmode="decimal" step="0.1" value="${Math.round((val ?? def) * 1000) / 10}"></div>`;
+const pctIn = (id, label, val, def, art) =>
+  `<div><label for="${id}">${label} <span class="hint">(${art})</span></label><input id="${id}" type="number" inputmode="decimal" step="0.1" value="${Math.round((val ?? def) * 1000) / 10}"></div>`;
 
 function formHtml(d) {
   const partiel = Number(d.hebdo) < 35;
   return `<div class="card"><h3>${ui.editing === "new" ? "Nouveau contrat" : "Modifier le contrat"}</h3>
     ${ui.editing !== "new" ? `<p class="small muted">La modification est <b>ajoutée</b> à la chaîne (correction tracée) : l'ancienne version reste lisible.</p>` : ""}
-    <label for="f-type">Type</label><select id="f-type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${d.type === k ? "selected" : ""}>${v.label}</option>`).join("")}</select>
+    <label for="f-type">Type</label><select id="f-type">${Object.entries(TYPES)
+      .map(([k, v]) => `<option value="${k}" ${d.type === k ? "selected" : ""}>${v.label}</option>`)
+      .join("")}</select>
     <label for="f-mode">Je suis payé</label><select id="f-mode"><option value="horaire" ${d.mode !== "mensuel" ? "selected" : ""}>à l'heure</option><option value="mensuel" ${d.mode === "mensuel" ? "selected" : ""}>au mois (salaire mensuel)</option></select>
     <div class="grid2">
       ${d.mode === "mensuel" ? `<div><label for="f-mensuel">Salaire mensuel brut (€)</label><input id="f-mensuel" type="number" inputmode="decimal" step="0.01" value="${esc(d.mensuel)}"></div>` : `<div><label for="f-taux">Taux horaire brut (€)</label><input id="f-taux" type="number" inputmode="decimal" step="0.01" value="${esc(d.taux)}"></div>`}
@@ -24,8 +72,12 @@ function formHtml(d) {
     ${partiel ? `<p class="note info">Temps partiel : au-delà de ${String(d.hebdo).replace(".", ",")} h, les heures complémentaires sont majorées de 10 % puis 25 % (L3123-29).</p>` : ""}
     <label for="f-employeur">${d.type === "interim" ? "Agence d'intérim" : "Employeur"}</label><input id="f-employeur" type="text" value="${esc(d.employeur)}">
     <label for="f-employeurAdresse">Adresse ${d.type === "interim" ? "de l'agence" : "de l'employeur"} <span class="hint">(pour les courriers)</span></label><input id="f-employeurAdresse" type="text" value="${esc(d.employeurAdresse)}">
-    ${d.type === "interim" ? `<label for="f-eu">Entreprise utilisatrice</label><input id="f-eu" type="text" value="${esc(d.eu)}">
-      <label for="f-tauxRef">Taux de référence de l'entreprise utilisatrice (€/h) <span class="hint">facultatif — figure au contrat de mise à disposition (L1251-43)</span></label><input id="f-tauxRef" type="number" inputmode="decimal" step="0.01" value="${esc(d.tauxRef ?? "")}">` : ""}
+    ${
+      d.type === "interim"
+        ? `<label for="f-eu">Entreprise utilisatrice</label><input id="f-eu" type="text" value="${esc(d.eu)}">
+      <label for="f-tauxRef">Taux de référence de l'entreprise utilisatrice (€/h) <span class="hint">facultatif — figure au contrat de mise à disposition (L1251-43)</span></label><input id="f-tauxRef" type="number" inputmode="decimal" step="0.01" value="${esc(d.tauxRef ?? "")}">`
+        : ""
+    }
     <label for="f-lieu">Lieu de travail / chantier</label><input id="f-lieu" type="text" value="${esc(d.lieu)}">
     <label for="f-poste">Poste</label><input id="f-poste" type="text" value="${esc(d.poste)}">
     <label for="f-convention">Convention collective <span class="hint">(texte libre, ex. « Ouvriers du bâtiment, IDCC 1597 »)</span></label><input id="f-convention" type="text" value="${esc(d.convention)}">
@@ -46,29 +98,79 @@ function formHtml(d) {
 }
 
 function readForm(el) {
-  const d = ui.draft; const v = (id) => { const i = el.querySelector("#f-" + id); return i ? i.value.trim() : d[id]; };
-  for (const k of ["type", "mode", "taux", "mensuel", "hebdo", "employeur", "employeurAdresse", "eu", "tauxRef", "lieu", "poste", "convention", "dateDebut", "dateFin"]) d[k] = v(k);
+  const d = ui.draft;
+  const v = (id) => {
+    const i = el.querySelector("#f-" + id);
+    return i ? i.value.trim() : d[id];
+  };
+  for (const k of [
+    "type",
+    "mode",
+    "taux",
+    "mensuel",
+    "hebdo",
+    "employeur",
+    "employeurAdresse",
+    "eu",
+    "tauxRef",
+    "lieu",
+    "poste",
+    "convention",
+    "dateDebut",
+    "dateFin",
+  ]) {
+    d[k] = v(k);
+  }
   for (const k of ["taux", "mensuel", "hebdo", "tauxRef"]) d[k] = d[k] === "" || d[k] == null ? "" : Number(d[k]);
-  const r = (id, key) => { const i = el.querySelector("#r-" + id); if (i && i.value !== "") { const x = Number(i.value) / 100; if (Math.abs(x - DEFAULT_RULES[key]) > 1e-9) d.rules[key] = x; else delete d.rules[key]; } };
-  r("hs1", "hs1Taux"); r("hs2", "hs2Taux"); r("hc1", "hc1Taux"); r("hc2", "hc2Taux"); r("fin", "finTaux"); r("iccp", "iccpTaux");
-  const inc = el.querySelector("#r-incl"); if (inc) d.rules.iccpInclutFin = inc.checked;
+  const r = (id, key) => {
+    const i = el.querySelector("#r-" + id);
+    if (i && i.value !== "") {
+      const x = Number(i.value) / 100;
+      if (Math.abs(x - DEFAULT_RULES[key]) > 1e-9) d.rules[key] = x;
+      else delete d.rules[key];
+    }
+  };
+  r("hs1", "hs1Taux");
+  r("hs2", "hs2Taux");
+  r("hc1", "hc1Taux");
+  r("hc2", "hc2Taux");
+  r("fin", "finTaux");
+  r("iccp", "iccpTaux");
+  const inc = el.querySelector("#r-incl");
+  if (inc) d.rules.iccpInclutFin = inc.checked;
   return d;
 }
 
 async function handleFile(ctx, file) {
-  ui.error = ""; ui.proposals = null; ui.progress = { status: "Préparation", progress: 0 }; ctx.go("contrat");
-  const prog = (m) => { ui.progress = m; const bar = document.querySelector("#imp-bar"); const st = document.querySelector("#imp-st"); if (bar) bar.style.width = Math.round((m.progress || 0) * 100) + "%"; if (st) st.textContent = m.status || ""; };
+  ui.error = "";
+  ui.proposals = null;
+  ui.progress = { status: "Préparation", progress: 0 };
+  ctx.go("contrat");
+  const prog = (m) => {
+    ui.progress = m;
+    const bar = document.querySelector("#imp-bar");
+    const st = document.querySelector("#imp-st");
+    if (bar) bar.style.width = Math.round((m.progress || 0) * 100) + "%";
+    if (st) st.textContent = m.status || "";
+  };
   try {
     const { pdfToText, pdfPageToBlob, imageToText } = await import("../importer.js");
     let text = "";
     if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-      const r = await pdfToText(file, prog); text = r.text;
-      if (text.replace(/\s/g, "").length < 40) { prog({ status: "PDF scanné : lecture de l'image (OCR)", progress: 0 }); text = (await imageToText(await pdfPageToBlob(r.doc, 1), prog)).text; }
+      const r = await pdfToText(file, prog);
+      text = r.text;
+      if (text.replace(/\s/g, "").length < 40) {
+        prog({ status: "PDF scanné : lecture de l'image (OCR)", progress: 0 });
+        text = (await imageToText(await pdfPageToBlob(r.doc, 1), prog)).text;
+      }
     } else text = (await imageToText(file, prog)).text;
     ui.rawText = text;
     ui.proposals = parseContrat(text);
-  } catch (e) { ui.error = "ÉCHEC de lecture : " + (e.message || e) + ". Vous pouvez coller le texte du contrat ci-dessous."; }
-  ui.progress = null; ctx.go("contrat");
+  } catch (e) {
+    ui.error = "ÉCHEC de lecture : " + (e.message || e) + ". Vous pouvez coller le texte du contrat ci-dessous.";
+  }
+  ui.progress = null;
+  ctx.go("contrat");
 }
 
 function importCard() {
@@ -81,10 +183,20 @@ function importCard() {
     ${ui.error ? `<p class="note bad">${esc(ui.error)}</p>` : ""}
     <details ${ui.rawText && !P ? "open" : ""}><summary style="min-height:48px;display:flex;align-items:center">ou coller le texte du contrat</summary>
       <textarea id="imp-text" placeholder="Collez ici le texte du contrat">${esc(ui.rawText)}</textarea><button class="btn" id="imp-parse">Analyser ce texte</button></details>
-    ${P ? (Object.keys(P).length ? `<h3 style="margin-top:1rem">Ce que j'ai trouvé — cochez ce qui est juste</h3>
-      ${Object.entries(P).map(([k, f]) => `<div class="field-proposal"><input type="checkbox" data-k="${k}" checked aria-label="${FIELDS[k] || k}"><div><b>${FIELDS[k] || k} :</b> ${esc(showVal(k, f.value))}<div class="ex">« ${esc(f.extrait)} »</div></div></div>`).join("")}
+    ${
+      P
+        ? Object.keys(P).length
+          ? `<h3 style="margin-top:1rem">Ce que j'ai trouvé — cochez ce qui est juste</h3>
+      ${Object.entries(P)
+        .map(
+          ([k, f]) =>
+            `<div class="field-proposal"><input type="checkbox" data-k="${k}" checked aria-label="${FIELDS[k] || k}"><div><b>${FIELDS[k] || k} :</b> ${esc(showVal(k, f.value))}<div class="ex">« ${esc(f.extrait)} »</div></div></div>`,
+        )
+        .join("")}
       <button class="btn primary" id="imp-apply">Remplir le formulaire avec la sélection</button><p class="small muted">Rien n'est enregistré avant que vous appuyiez sur « Enregistrer ».</p>`
-      : `<p class="note">Aucun champ reconnu. Remplissez le formulaire à la main.</p>`) : ""}</div>`;
+          : `<p class="note">Aucun champ reconnu. Remplissez le formulaire à la main.</p>`
+        : ""
+    }</div>`;
 }
 
 function rulesCard() {
@@ -102,29 +214,47 @@ function rulesCard() {
 }
 
 function finDialog(ctx, c) {
-  ctx.dialog(`<h2>Terminer ce contrat</h2>
+  ctx.dialog(
+    `<h2>Terminer ce contrat</h2>
     <label for="e-at">Dernier jour</label><input id="e-at" type="date" value="${new Date().toISOString().slice(0, 10)}">
-    <label for="e-motif">Motif</label><select id="e-motif">${Object.entries(MOTIFS_FIN).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select>
+    <label for="e-motif">Motif</label><select id="e-motif">${Object.entries(MOTIFS_FIN)
+      .map(([k, v]) => `<option value="${k}">${v.label}</option>`)
+      .join("")}</select>
     ${c.type === "cdd" ? `<label class="check"><input type="checkbox" id="e-cp"><span>J'ai pu prendre tous mes congés pendant le CDD (pas d'ICCP)</span></label>` : ""}
     <p class="small muted">Le motif décide si l'indemnité de fin est due (L1251-33, L1243-10).</p>
-    <button class="btn stop" id="e-ok">Terminer (scellé)</button><button class="btn ghost" id="e-x">Fermer</button>`, (d) => {
-    d.querySelector("#e-x").onclick = () => d.close();
-    d.querySelector("#e-ok").onclick = async () => {
-      const cp = d.querySelector("#e-cp");
-      await ctx.append("contrat_fin", { contratId: c.id, at: parisLocalToIso(d.querySelector("#e-at").value + "T18:00"), motif: d.querySelector("#e-motif").value, congesPris: cp ? cp.checked : false });
-      d.close(); ctx.toast("Fin de contrat scellée."); ctx.refresh();
-    };
-  });
+    <button class="btn stop" id="e-ok">Terminer (scellé)</button><button class="btn ghost" id="e-x">Fermer</button>`,
+    (d) => {
+      d.querySelector("#e-x").onclick = () => d.close();
+      d.querySelector("#e-ok").onclick = async () => {
+        const cp = d.querySelector("#e-cp");
+        await ctx.append("contrat_fin", {
+          contratId: c.id,
+          at: parisLocalToIso(d.querySelector("#e-at").value + "T18:00"),
+          motif: d.querySelector("#e-motif").value,
+          congesPris: cp ? cp.checked : false,
+        });
+        d.close();
+        ctx.toast("Fin de contrat scellée.");
+        ctx.refresh();
+      };
+    },
+  );
 }
 
 export default {
-  id: "contrat", label: "Contrat",
+  id: "contrat",
+  label: "Contrat",
   render(ctx, el) {
     const c = ctx.state.contrats.get(ctx.meta.currentContrat);
-    if (!c && !ui.editing) { ui.editing = "new"; ui.draft = blankDraft(); }
+    if (!c && !ui.editing) {
+      ui.editing = "new";
+      ui.draft = blankDraft();
+    }
     const th = c ? tauxHoraire(c) : 0;
     el.innerHTML = `${ui.editing ? "" : contratSelect(ctx)}
-      ${c && !ui.editing ? `<div class="card"><div class="row"><h2 class="grow">${TYPES[c.type].label}${c.hebdo < 35 ? " · temps partiel" : ""}</h2>${c.fin ? '<span class="tag">terminé</span>' : '<span class="tag ok">en cours</span>'}${c.exemple ? ' <span class="tag warn">EXEMPLE</span>' : ""}</div>
+      ${
+        c && !ui.editing
+          ? `<div class="card"><div class="row"><h2 class="grow">${TYPES[c.type].label}${c.hebdo < 35 ? " · temps partiel" : ""}</h2>${c.fin ? '<span class="tag">terminé</span>' : '<span class="tag ok">en cours</span>'}${c.exemple ? ' <span class="tag warn">EXEMPLE</span>' : ""}</div>
         <div class="grid2"><div class="kpi"><div class="l">${c.mode === "mensuel" ? "Mensuel brut" : "Taux horaire"}</div><div class="v num">${fmtEur(c.mode === "mensuel" ? c.mensuel : c.taux)}</div></div>
           <div class="kpi"><div class="l">Par semaine</div><div class="v num">${String(c.hebdo).replace(".", ",")} h</div></div></div>
         <table class="calc info" style="margin-top:.6rem">
@@ -140,44 +270,105 @@ export default {
           ${c.corrections.length ? `<tr><td class="muted">Modifications</td><td class="r wr">${c.corrections.length} (tracées)</td></tr>` : ""}
         </table>
         <div class="grid2"><button class="btn" id="c-edit">Modifier</button>${c.fin ? `<button class="btn" id="c-new">＋ Nouveau</button>` : `<button class="btn stop" id="c-end">Terminer</button>`}</div>
-        ${c.fin ? "" : `<button class="btn ghost" id="c-new2">＋ Ajouter un autre contrat</button>`}</div>` : ""}
+        ${c.fin ? "" : `<button class="btn ghost" id="c-new2">＋ Ajouter un autre contrat</button>`}</div>`
+          : ""
+      }
       ${ui.editing ? importCard() + formHtml(ui.draft) : ""}
       ${rulesCard()}`;
     bindContratSelect(ctx, el);
-    const on = (id, f) => { const b = el.querySelector(id); if (b) b.onclick = f; };
-    on("#c-edit", () => { ui.editing = c.id; ui.draft = draftFrom(c); ui.proposals = null; ctx.go("contrat"); });
-    const nw = () => { ui.editing = "new"; ui.draft = blankDraft(); ui.proposals = null; ui.rawText = ""; ctx.go("contrat"); };
-    on("#c-new", nw); on("#c-new2", nw);
+    const on = (id, f) => {
+      const b = el.querySelector(id);
+      if (b) b.onclick = f;
+    };
+    on("#c-edit", () => {
+      ui.editing = c.id;
+      ui.draft = draftFrom(c);
+      ui.proposals = null;
+      ctx.go("contrat");
+    });
+    const nw = () => {
+      ui.editing = "new";
+      ui.draft = blankDraft();
+      ui.proposals = null;
+      ui.rawText = "";
+      ctx.go("contrat");
+    };
+    on("#c-new", nw);
+    on("#c-new2", nw);
     on("#c-end", () => finDialog(ctx, c));
     if (!ui.editing) return;
-    ["#f-type", "#f-mode", "#f-hebdo"].forEach((id) => { const s = el.querySelector(id); if (s) s.onchange = () => { readForm(el); ctx.go("contrat"); }; });
-    const fi = el.querySelector("#imp-file"); if (fi) fi.onchange = () => fi.files[0] && handleFile(ctx, fi.files[0]);
-    on("#imp-parse", () => { ui.rawText = el.querySelector("#imp-text").value; ui.proposals = parseContrat(ui.rawText); ctx.go("contrat"); });
+    ["#f-type", "#f-mode", "#f-hebdo"].forEach((id) => {
+      const s = el.querySelector(id);
+      if (s) {
+        s.onchange = () => {
+          readForm(el);
+          ctx.go("contrat");
+        };
+      }
+    });
+    const fi = el.querySelector("#imp-file");
+    if (fi) fi.onchange = () => fi.files[0] && handleFile(ctx, fi.files[0]);
+    on("#imp-parse", () => {
+      ui.rawText = el.querySelector("#imp-text").value;
+      ui.proposals = parseContrat(ui.rawText);
+      ctx.go("contrat");
+    });
     on("#imp-apply", () => {
       readForm(el);
-      el.querySelectorAll("[data-k]").forEach((cb) => { if (cb.checked) ui.draft[cb.dataset.k] = ui.proposals[cb.dataset.k].value; });
-      ui.proposals = null; ctx.toast("Formulaire rempli : vérifiez puis enregistrez."); ctx.go("contrat");
+      el.querySelectorAll("[data-k]").forEach((cb) => {
+        if (cb.checked) ui.draft[cb.dataset.k] = ui.proposals[cb.dataset.k].value;
+      });
+      ui.proposals = null;
+      ctx.toast("Formulaire rempli : vérifiez puis enregistrez.");
+      ctx.go("contrat");
     });
-    el.querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => { readForm(el); ui.draft.avantages.splice(Number(b.dataset.rm), 1); ctx.go("contrat"); }));
+    el.querySelectorAll("[data-rm]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          readForm(el);
+          ui.draft.avantages.splice(Number(b.dataset.rm), 1);
+          ctx.go("contrat");
+        }),
+    );
     on("#av-add", () => {
       readForm(el);
-      const l = el.querySelector("#av-l").value.trim(), m = el.querySelector("#av-m").value;
+      const l = el.querySelector("#av-l").value.trim(),
+        m = el.querySelector("#av-m").value;
       if (!l || m === "") return ctx.toast("Libellé et montant.", true);
-      ui.draft.avantages.push({ libelle: l, montant: Number(m), base: el.querySelector("#av-b").checked }); ctx.go("contrat");
+      ui.draft.avantages.push({ libelle: l, montant: Number(m), base: el.querySelector("#av-b").checked });
+      ctx.go("contrat");
     });
-    on("#f-cancel", () => { ui.editing = c ? null : "new"; ui.draft = c ? null : blankDraft(); ui.proposals = null; ctx.go(c ? "contrat" : "pointer"); });
+    on("#f-cancel", () => {
+      ui.editing = c ? null : "new";
+      ui.draft = c ? null : blankDraft();
+      ui.proposals = null;
+      ctx.go(c ? "contrat" : "pointer");
+    });
     on("#f-save", async () => {
       const d = readForm(el);
-      if (d.mode === "mensuel" ? !(d.mensuel > 0) : !(d.taux > 0)) return ctx.toast(d.mode === "mensuel" ? "Indiquez le salaire mensuel brut." : "Indiquez le taux horaire brut.", true);
-      if (ui.editing === "new") {
-        const r = await ctx.append("contrat", d); await ctx.setMeta("currentContrat", r.id);
-      } else {
-        const old = ctx.state.contrats.get(ui.editing).raw; const changes = {};
-        for (const [k, v] of Object.entries(d)) if (JSON.stringify(v) !== JSON.stringify(old[k])) changes[k] = v;
-        if (Object.keys(changes).length) await ctx.append("correction", { targetId: ui.editing, changes, motif: "Modification du contrat" });
+      if (d.mode === "mensuel" ? !(d.mensuel > 0) : !(d.taux > 0)) {
+        return ctx.toast(
+          d.mode === "mensuel" ? "Indiquez le salaire mensuel brut." : "Indiquez le taux horaire brut.",
+          true,
+        );
       }
-      ui.editing = null; ui.draft = null; ui.proposals = null; ui.rawText = "";
-      ctx.toast("Contrat scellé."); ctx.refresh();
+      if (ui.editing === "new") {
+        const r = await ctx.append("contrat", d);
+        await ctx.setMeta("currentContrat", r.id);
+      } else {
+        const old = ctx.state.contrats.get(ui.editing).raw;
+        const changes = {};
+        for (const [k, v] of Object.entries(d)) if (JSON.stringify(v) !== JSON.stringify(old[k])) changes[k] = v;
+        if (Object.keys(changes).length) {
+          await ctx.append("correction", { targetId: ui.editing, changes, motif: "Modification du contrat" });
+        }
+      }
+      ui.editing = null;
+      ui.draft = null;
+      ui.proposals = null;
+      ui.rawText = "";
+      ctx.toast("Contrat scellé.");
+      ctx.refresh();
     });
   },
 };

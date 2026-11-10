@@ -17,7 +17,7 @@ Chaque saisie est scellée dans une chaîne d'empreintes SHA-256. Pas de compte,
 Les montants sont une **estimation**, à vérifier. **Ce n'est pas un conseil juridique.** Une convention collective peut prévoir mieux que la loi.
 Les pointages, le contrat et les bulletins **restent sur le téléphone**. Rien n'est envoyé à un serveur : un export ou une copie du courrier n'a lieu que si vous le demandez.
 
-Les règles retenues, leurs sources et leurs limites sont dans [regles.md](regles.md).
+Les règles retenues, leurs sources et leurs limites sont dans [regles.md](regles.md). La correspondance avec les tests est dans [docs/REGLES-TESTS.md](docs/REGLES-TESTS.md).
 
 ## Aperçu
 

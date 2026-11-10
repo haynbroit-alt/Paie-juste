@@ -1,38 +1,125 @@
 /** Courriers (texte brut). Rien n'est envoyé : l'utilisateur copie, imprime ou enregistre en PDF. */
 import { fmtEur } from "./calc.js";
 
-export const NOT_LEGAL_ADVICE = "Ce document a été préparé avec une application personnelle. Ce n'est pas un conseil juridique. Les montants sont une estimation à vérifier.";
+export const NOT_LEGAL_ADVICE =
+  "Ce document a été préparé avec une application personnelle. Ce n'est pas un conseil juridique. Les montants sont une estimation à vérifier.";
 
 export const ARTICLES = {
-  "L1251-32": { titre: "indemnité de fin de mission égale à 10 % de la rémunération totale brute", url: "https://code.travail.gouv.fr/code-du-travail/l1251-32" },
-  "L1251-19": { titre: "indemnité compensatrice de congés payés d'au moins un dixième de la rémunération totale brute", url: "https://code.travail.gouv.fr/code-du-travail/l1251-19" },
-  "L3121-36": { titre: "majoration des heures supplémentaires (25 % puis 50 %, à défaut d'accord)", url: "https://code.travail.gouv.fr/code-du-travail/l3121-36" },
-  "L1243-8": { titre: "indemnité de fin de contrat (CDD) égale à 10 % de la rémunération totale brute", url: "https://code.travail.gouv.fr/code-du-travail/l1243-8" },
-  "L1242-16": { titre: "indemnité compensatrice de congés payés en CDD d'au moins un dixième de la rémunération totale brute", url: "https://code.travail.gouv.fr/code-du-travail/l1242-16" },
-  "L3123-29": { titre: "majoration des heures complémentaires du temps partiel (10 % puis 25 %, à défaut d'accord)", url: "https://code.travail.gouv.fr/code-du-travail/l3123-29" },
-  "L3242-1": { titre: "mensualisation de la rémunération", url: "https://code.travail.gouv.fr/code-du-travail/l3242-1" },
-  "L3121-27": { titre: "durée légale de 35 heures par semaine", url: "https://code.travail.gouv.fr/code-du-travail/l3121-27" },
-  "L1251-18": { titre: "rémunération au moins égale à celle prévue au contrat de mise à disposition", url: "https://code.travail.gouv.fr/code-du-travail/l1251-18" },
-  "L3245-1": { titre: "prescription de trois ans de l'action en paiement du salaire", url: "https://code.travail.gouv.fr/code-du-travail/l3245-1" },
-  "L3243-3": { titre: "l'acceptation d'un bulletin de paie sans réserve ne vaut pas renonciation", url: "https://code.travail.gouv.fr/code-du-travail/l3243-3" },
+  "L1251-32": {
+    titre: "indemnité de fin de mission égale à 10 % de la rémunération totale brute",
+    url: "https://code.travail.gouv.fr/code-du-travail/l1251-32",
+  },
+  "L1251-19": {
+    titre: "indemnité compensatrice de congés payés d'au moins un dixième de la rémunération totale brute",
+    url: "https://code.travail.gouv.fr/code-du-travail/l1251-19",
+  },
+  "L3121-36": {
+    titre: "majoration des heures supplémentaires (25 % puis 50 %, à défaut d'accord)",
+    url: "https://code.travail.gouv.fr/code-du-travail/l3121-36",
+  },
+  "L1243-8": {
+    titre: "indemnité de fin de contrat (CDD) égale à 10 % de la rémunération totale brute",
+    url: "https://code.travail.gouv.fr/code-du-travail/l1243-8",
+  },
+  "L1242-16": {
+    titre: "indemnité compensatrice de congés payés en CDD d'au moins un dixième de la rémunération totale brute",
+    url: "https://code.travail.gouv.fr/code-du-travail/l1242-16",
+  },
+  "L3123-29": {
+    titre: "majoration des heures complémentaires du temps partiel (10 % puis 25 %, à défaut d'accord)",
+    url: "https://code.travail.gouv.fr/code-du-travail/l3123-29",
+  },
+  "L3242-1": {
+    titre: "mensualisation de la rémunération",
+    url: "https://code.travail.gouv.fr/code-du-travail/l3242-1",
+  },
+  "L3121-27": {
+    titre: "durée légale de 35 heures par semaine",
+    url: "https://code.travail.gouv.fr/code-du-travail/l3121-27",
+  },
+  "L1251-18": {
+    titre: "rémunération au moins égale à celle prévue au contrat de mise à disposition",
+    url: "https://code.travail.gouv.fr/code-du-travail/l1251-18",
+  },
+  "L3245-1": {
+    titre: "prescription de trois ans de l'action en paiement du salaire",
+    url: "https://code.travail.gouv.fr/code-du-travail/l3245-1",
+  },
+  "L3243-3": {
+    titre: "l'acceptation d'un bulletin de paie sans réserve ne vaut pas renonciation",
+    url: "https://code.travail.gouv.fr/code-du-travail/l3243-3",
+  },
   "L3171-4": { titre: "preuve des heures de travail", url: "https://code.travail.gouv.fr/code-du-travail/l3171-4" },
 };
 
 /** Contacts vérifiés le 10/11/2026 (voir regles.md, section 5). */
 export const CONTACTS = [
-  { nom: "Renseignement en droit du travail — DDETS de l'Hérault", role: "Inspection du travail (réseau DREETS Occitanie). Informe, conseille, oriente. Gratuit et confidentiel.", lignes: ["615 boulevard d'Antigone, CS 19002, 34064 Montpellier Cedex 2", "Accueil sur rendez-vous"], tel: "0806000126", telAff: "0 806 000 126 (lun.-ven. 9 h-11 h 30, 13 h 30-16 h)", mail: "ddets-droit-du-travail-renseignements@herault.gouv.fr", source: "https://lannuaire.service-public.gouv.fr/occitanie/herault/e2f3a3cd-edd3-4733-94d8-23c08c8c46b7" },
-  { nom: "Conseil de prud'hommes de Montpellier", role: "Tribunal des litiges du travail.", lignes: ["9 rue de Tarragone, 34000 Montpellier", "Courrier : 34040 Montpellier Cedex 1", "Lun.-ven. 8 h-12 h et 13 h 30-16 h 30"], tel: "0434083200", telAff: "04 34 08 32 00", mail: "cph-montpellier@justice.fr", source: "https://lannuaire.service-public.gouv.fr/occitanie/herault/651c531c-ff94-4d52-828d-0e1c778e3171" },
-  { nom: "Union locale CGT de Montpellier", role: "Syndicat : aide tous les salariés (CDI, CDD, intérim, temps partiel).", lignes: ["Maison des syndicats, 474 allée Henri II de Montmorency, 34000 Montpellier"], tel: "0467159170", telAff: "04 67 15 91 70", mail: "ul.montpellier@cgtmontpellier.com", source: "https://herault.cgt.fr/la-cgt-pres-de-chez-vous" },
-  { nom: "Union départementale CGT de l'Hérault", role: "Syndicat.", lignes: ["Maison des syndicats, 474 allée Henri II de Montmorency, 34000 Montpellier"], tel: "0467159167", telAff: "04 67 15 91 67", mail: "secretariat@cgt34.fr", source: "https://herault.cgt.fr/la-cgt-pres-de-chez-vous" },
-  { nom: "DREETS Occitanie (siège)", role: "Direction régionale. Le renseignement se fait dans les DDETS départementales (ci-dessus).", lignes: ["1 place Émile Blouin, CS 90007, 31952 Toulouse Cedex 9"], source: "https://occitanie.dreets.gouv.fr/contact-18711" },
-  { nom: "Code du travail numérique — modèle officiel", role: "Modèle « Demande de paiement de salaire » du ministère du Travail.", lignes: [], lien: "https://code.travail.gouv.fr/modeles-de-courriers/demande-de-paiement-de-salaire", source: "https://code.travail.gouv.fr/modeles-de-courriers/demande-de-paiement-de-salaire" },
+  {
+    nom: "Renseignement en droit du travail — DDETS de l'Hérault",
+    role: "Inspection du travail (réseau DREETS Occitanie). Informe, conseille, oriente. Gratuit et confidentiel.",
+    lignes: ["615 boulevard d'Antigone, CS 19002, 34064 Montpellier Cedex 2", "Accueil sur rendez-vous"],
+    tel: "0806000126",
+    telAff: "0 806 000 126 (lun.-ven. 9 h-11 h 30, 13 h 30-16 h)",
+    mail: "ddets-droit-du-travail-renseignements@herault.gouv.fr",
+    source: "https://lannuaire.service-public.gouv.fr/occitanie/herault/e2f3a3cd-edd3-4733-94d8-23c08c8c46b7",
+  },
+  {
+    nom: "Conseil de prud'hommes de Montpellier",
+    role: "Tribunal des litiges du travail.",
+    lignes: [
+      "9 rue de Tarragone, 34000 Montpellier",
+      "Courrier : 34040 Montpellier Cedex 1",
+      "Lun.-ven. 8 h-12 h et 13 h 30-16 h 30",
+    ],
+    tel: "0434083200",
+    telAff: "04 34 08 32 00",
+    mail: "cph-montpellier@justice.fr",
+    source: "https://lannuaire.service-public.gouv.fr/occitanie/herault/651c531c-ff94-4d52-828d-0e1c778e3171",
+  },
+  {
+    nom: "Union locale CGT de Montpellier",
+    role: "Syndicat : aide tous les salariés (CDI, CDD, intérim, temps partiel).",
+    lignes: ["Maison des syndicats, 474 allée Henri II de Montmorency, 34000 Montpellier"],
+    tel: "0467159170",
+    telAff: "04 67 15 91 70",
+    mail: "ul.montpellier@cgtmontpellier.com",
+    source: "https://herault.cgt.fr/la-cgt-pres-de-chez-vous",
+  },
+  {
+    nom: "Union départementale CGT de l'Hérault",
+    role: "Syndicat.",
+    lignes: ["Maison des syndicats, 474 allée Henri II de Montmorency, 34000 Montpellier"],
+    tel: "0467159167",
+    telAff: "04 67 15 91 67",
+    mail: "secretariat@cgt34.fr",
+    source: "https://herault.cgt.fr/la-cgt-pres-de-chez-vous",
+  },
+  {
+    nom: "DREETS Occitanie (siège)",
+    role: "Direction régionale. Le renseignement se fait dans les DDETS départementales (ci-dessus).",
+    lignes: ["1 place Émile Blouin, CS 90007, 31952 Toulouse Cedex 9"],
+    source: "https://occitanie.dreets.gouv.fr/contact-18711",
+  },
+  {
+    nom: "Code du travail numérique — modèle officiel",
+    role: "Modèle « Demande de paiement de salaire » du ministère du Travail.",
+    lignes: [],
+    lien: "https://code.travail.gouv.fr/modeles-de-courriers/demande-de-paiement-de-salaire",
+    source: "https://code.travail.gouv.fr/modeles-de-courriers/demande-de-paiement-de-salaire",
+  },
 ];
-export const CONTACTS_NOTE = "Autres syndicats (CFDT, FO, CFTC, CFE-CGC, Solidaires…) : coordonnées locales non vérifiées, donc non listées. Ce n'est pas une préférence.";
+export const CONTACTS_NOTE =
+  "Autres syndicats (CFDT, FO, CFTC, CFE-CGC, Solidaires…) : coordonnées locales non vérifiées, donc non listées. Ce n'est pas une préférence.";
 
 function tableEcarts(cmp) {
   const rows = cmp.lines.filter((l) => l.ecart != null && Math.abs(l.ecart) >= 0.01);
   if (!rows.length) return "  (aucun écart ligne par ligne)";
-  return rows.map((l) => `  - ${l.label} : attendu ${fmtEur(l.attendu)}, versé ${fmtEur(l.recu)}, écart ${fmtEur(l.ecart)} (art. ${l.regle})`).join("\n");
+  return rows
+    .map(
+      (l) =>
+        `  - ${l.label} : attendu ${fmtEur(l.attendu)}, versé ${fmtEur(l.recu)}, écart ${fmtEur(l.ecart)} (art. ${l.regle})`,
+    )
+    .join("\n");
 }
 function articlesCites(cmp) {
   const keys = new Set(["L3243-3", "L3245-1"]);
@@ -42,17 +129,26 @@ function articlesCites(cmp) {
   return [...keys].map((k) => `  - Article ${k} du Code du travail : ${ARTICLES[k].titre}.`).join("\n");
 }
 function entete(ctx) {
-  const p = ctx.profil || {}, m = ctx.mission || {};
+  const p = ctx.profil || {},
+    m = ctx.mission || {};
   return [
-    p.nom || "[Votre nom et prénom]", p.adresse || "[Votre adresse]", "",
-    `À l'attention de : ${m.employeur || "[Employeur]"}`, m.employeurAdresse || "[Adresse de l'employeur]", "",
-    `Fait à ${p.ville || "Montpellier"}, le ${ctx.dateStr}`, "",
+    p.nom || "[Votre nom et prénom]",
+    p.adresse || "[Votre adresse]",
+    "",
+    `À l'attention de : ${m.employeur || "[Employeur]"}`,
+    m.employeurAdresse || "[Adresse de l'employeur]",
+    "",
+    `Fait à ${p.ville || "Montpellier"}, le ${ctx.dateStr}`,
+    "",
   ].join("\n");
 }
 function refMission(ctx) {
   const m = ctx.mission || {};
   const type = { cdi: "CDI", cdd: "CDD", interim: "Contrat de mission (intérim)" }[m.type] || "Contrat";
-  const sal = m.mode === "mensuel" ? `salaire mensuel ${fmtEur(m.mensuel || 0)} brut pour ${m.hebdo} h par semaine` : `taux horaire ${fmtEur(m.taux || 0)} brut`;
+  const sal =
+    m.mode === "mensuel"
+      ? `salaire mensuel ${fmtEur(m.mensuel || 0)} brut pour ${m.hebdo} h par semaine`
+      : `taux horaire ${fmtEur(m.taux || 0)} brut`;
   return `Contrat : ${type}${m.eu ? " — entreprise utilisatrice " + m.eu : ""}${m.lieu ? " — lieu " + m.lieu : ""} — ${sal}.\nPériode concernée : ${ctx.periodeLabel}.`;
 }
 function annexe(ctx) {
@@ -129,7 +225,10 @@ ${NOT_LEGAL_ADVICE} Avant d'envoyer une mise en demeure, faites-vous relire par 
 
 export function annexeReleve(ctx) {
   const a = ctx.annexe || {};
-  const lines = (a.punches || []).map((p) => `${p.quand}  ${p.action.padEnd(8)}  ${p.contrat}${p.corrige ? "  [corrigé : " + p.motif + "]" : ""}${p.annule ? "  [annulé]" : ""}  #${p.hash.slice(0, 12)}`);
+  const lines = (a.punches || []).map(
+    (p) =>
+      `${p.quand}  ${p.action.padEnd(8)}  ${p.contrat}${p.corrige ? "  [corrigé : " + p.motif + "]" : ""}${p.annule ? "  [annulé]" : ""}  #${p.hash.slice(0, 12)}`,
+  );
   return `ANNEXE — Relevé personnel des heures (scellé SHA-256)
 
 Contrat : ${(ctx.mission && ctx.mission.employeur) || ""}${ctx.mission && ctx.mission.eu ? " / " + ctx.mission.eu : ""} — ${(ctx.mission && ctx.mission.lieu) || ""}
