@@ -76,12 +76,8 @@ function journeeCard(ctx, today, jour, existant) {
       <div class="total-jour"><span>Total travaillé</span><b class="num" id="j-total">—</b></div>
       ${
         modif
-          ? `${
-              existant.aVerifier
-                ? `<p class="note bad">Journée incomplète (arrivée ${esc(existant.arrivee || "?")}${existant.depart ? "" : ", départ manquant"}). Complétez-la puis enregistrez : l'ancienne version reste dans l'historique.</p>`
-                : `<p class="note">Ce jour est déjà noté (${esc(existant.arrivee)} → ${esc(existant.depart)}, ${fmtH(existant.minutes)}). Pour le changer, indiquez pourquoi : l'ancienne version reste dans l'historique.</p>`
-            }
-      <label for="j-motif">Pourquoi cette modification ? (obligatoire)</label><input id="j-motif" type="text" value="${existant.aVerifier ? "Journée complétée" : ""}" placeholder="Ex. : je suis parti à 17 h, pas 16 h 30">`
+          ? `${existant.aVerifier ? `<p class="note bad">Départ manquant : complétez la journée.</p>` : ""}
+      <label for="j-motif">Pourquoi ce changement ?</label><input id="j-motif" type="text" value="${existant.aVerifier ? "Journée complétée" : ""}" placeholder="Ex. : parti à 17 h">`
           : ""
       }
       <p class="note bad" id="j-err" hidden></p>
@@ -139,7 +135,7 @@ function bindJournee(ctx, el, c, existant) {
   const motifOk = () => {
     const m = $("#j-motif") ? $("#j-motif").value.trim() : "";
     if ($("#j-motif") && !m) {
-      ctx.toast("Indiquez pourquoi vous modifiez cette journée.", true);
+      ctx.toast("Indiquez pourquoi.", true);
       return null;
     }
     return m;
@@ -167,7 +163,7 @@ function bindJournee(ctx, el, c, existant) {
       if (m === null) return;
       for (const id of existant.ids) await ctx.append("correction", { targetId: id, motif: m, annule: true });
       ui.edit = false;
-      ctx.toast("Journée supprimée. Elle reste visible, barrée, dans l'historique.");
+      ctx.toast("Journée supprimée.");
       ctx.refresh();
     };
   }
@@ -193,7 +189,6 @@ function semaineCard(c, punches, lundi, today) {
         <tr class="tot"><td>Total</td><td class="r num" id="s-total">${fmtH(s.total)}</td></tr>
         ${sup ? `<tr><td>${c.hebdo < 35 ? "dont heures compl. et sup" : "dont heures sup"}</td><td class="r num" style="color:var(--amber)">${fmtH(sup)}</td></tr>` : ""}
       </table>
-      <p class="small dim">Touchez un jour pour le noter ou le modifier.</p>
     </div>`;
 }
 
@@ -211,7 +206,6 @@ function historiqueCard(journees, today) {
           <b class="num">${j.supprimee ? "" : fmtH(j.minutes)}</b></li>`,
         )
         .join("")}</ul>
-      <p class="small dim">Chaque journée est scellée par une empreinte SHA-256 qui inclut la précédente : une modification ne remplace rien, elle s'ajoute et se voit. Ce n'est pas une preuve certifiée.</p>
     </details>`;
 }
 
@@ -222,13 +216,11 @@ function appUrl() {
 function rappelCard(ctx, today) {
   const heure = ctx.meta.rappelHeure || "19:00";
   const [soir, mois] = rappelsParDefaut({ date: today, heure, appUrl: appUrl() });
-  return `<details class="card" id="rappel"><summary style="min-height:48px;display:flex;align-items:center"><b>🔔 Me rappeler le soir de noter mes heures</b></summary>
-      <p class="small muted">Le rappel passe par l'agenda de votre téléphone, qui sonne tout seul, même appli fermée.</p>
+  return `<details class="card" id="rappel"><summary style="min-height:48px;display:flex;align-items:center"><b>🔔 Rappel du soir</b></summary>
       ${heureChamp("r-heure", "Heure du rappel", heure)}
-      <a class="btn primary" id="r-soir" target="_blank" rel="noopener" href="${esc(googleAgendaUrl(soir))}">Rappel chaque soir (lun.-ven.) dans Google Agenda</a>
-      <a class="btn" id="r-mois" target="_blank" rel="noopener" href="${esc(googleAgendaUrl(mois))}">Rappel le dernier jour du mois : vérifier ma paie</a>
-      <button class="btn ghost" id="r-ics">Autre agenda : télécharger les 2 rappels (.ics)</button>
-      <p class="small dim">Google Agenda s'ouvre avec le rappel déjà rempli : appuyez sur « Enregistrer ». Aucune donnée de paie n'est envoyée, seulement le titre et l'heure.</p>
+      <a class="btn primary" id="r-soir" target="_blank" rel="noopener" href="${esc(googleAgendaUrl(soir))}">Rappel chaque soir</a>
+      <a class="btn" id="r-mois" target="_blank" rel="noopener" href="${esc(googleAgendaUrl(mois))}">Rappel en fin de mois</a>
+      <button class="btn ghost" id="r-ics">Autre agenda (.ics)</button>
     </details>`;
 }
 
@@ -245,7 +237,7 @@ function bindRappel(ctx, el, today) {
   el.querySelector("#r-ics").onclick = () => {
     const ics = rappelsIcs(rappelsParDefaut({ date: today, heure: lire(), appUrl: appUrl() }));
     downloadBlob("paie-juste-rappels.ics", new Blob([ics], { type: "text/calendar" }));
-    ctx.toast("Fichier enregistré : ouvrez-le pour l'ajouter à votre agenda.");
+    ctx.toast("Fichier enregistré.");
   };
 }
 
@@ -272,10 +264,10 @@ export default {
     const rienAujourdhui = !journees.some((j) => j.date === today && !j.supprimee);
     el.innerHTML = `
       ${contratSelect(ctx)}
-      ${rienAujourdhui && heureParis >= 17 ? `<p class="note" id="j-oubli">Vous n'avez pas encore noté vos heures aujourd'hui.</p>` : ""}
+      ${rienAujourdhui && heureParis >= 17 ? `<p class="note" id="j-oubli">Heures du jour pas encore notées.</p>` : ""}
       ${existant && !existant.supprimee && !existant.aVerifier && !ui.edit ? faitCard(today, jour, existant) : journeeCard(ctx, today, jour, existant)}
       ${semaineCard(c, punches, lundi, today)}
-      <button class="btn" id="go-paie">📄 Voir le détail de mon salaire du mois</button>
+      <button class="btn" id="go-paie">📄 Mon salaire du mois</button>
       ${historiqueCard(journees, today)}
       ${rappelCard(ctx, today)}`;
     bindContratSelect(ctx, el);
