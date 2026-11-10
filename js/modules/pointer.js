@@ -1,9 +1,20 @@
-import { parisDate, weekKey, fmtH, workIntervals, minutesByDay, splitWeekly, sumRows, TYPES } from "../calc.js";
-import { esc, fmtHeure, fmtJour, nowIso, isoToParisLocal, parisLocalToIso, downloadBlob } from "../util.js";
-import { journeePunches, motifJournee, googleAgendaUrl, rappelsIcs, rappelsParDefaut } from "../journee.js";
+import { parisDate, weekKey, fmtH, splitWeekly, sumRows, minutesByDay, workIntervals, TYPES } from "../calc.js";
+import { esc, fmtJour, nowIso, isoToParisLocal, downloadBlob } from "../util.js";
+import {
+  journeePunches,
+  motifJournee,
+  googleAgendaUrl,
+  rappelsIcs,
+  rappelsParDefaut,
+  resumeJournees,
+  joursDeSemaine,
+  joursRecents,
+} from "../journee.js";
 
-const LABELS = { debut: "Début", pause: "Pause", reprise: "Reprise", fin: "Fin" };
-let tick = null;
+/** Choix faits à l'écran, gardés le temps de la visite (rien n'est enregistré). */
+const ui = { jour: null, semaine: null, edit: false };
+const PAUSES = [0, 15, 30, 45, 60, 75, 90, 120];
+const JOURS_NOMS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
 export function contratLabel(c) {
   if (!c) return "";
@@ -24,191 +35,178 @@ export function bindContratSelect(ctx, el, id = "sel-contrat") {
   }
 }
 
-function liveNumbers(ctx) {
-  const c = ctx.state.contrats.get(ctx.meta.currentContrat);
-  const now = nowIso();
-  const punches = ctx.state.punches.filter((p) => p.contratId === c.id);
-  const w = workIntervals(punches, { now });
-  const byDay = minutesByDay(w.intervals);
-  const today = parisDate(now);
-  const { rows } = splitWeekly(byDay, c);
-  const wk = sumRows(rows.filter((r) => r.week === weekKey(today)));
-  const secToday = w.intervals
-    .filter((i) => parisDate(i.start) === today)
-    .reduce((a, i) => a + (new Date(i.end) - new Date(i.start)) / 1000, 0);
-  const last = punches[punches.length - 1];
-  const etat = !last || last.action === "fin" ? "idle" : last.action === "pause" ? "pause" : "work";
-  return { secToday, wk, etat, today, rows };
-}
-const hms = (s) => {
-  s = Math.max(0, Math.floor(s));
-  return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((x) => String(x).padStart(2, "0")).join(":");
-};
-
-async function getGps() {
-  if (!("geolocation" in navigator)) return { indisponible: true };
-  return new Promise((res) =>
-    navigator.geolocation.getCurrentPosition(
-      (p) =>
-        res({
-          lat: Math.round(p.coords.latitude * 1e5) / 1e5,
-          lon: Math.round(p.coords.longitude * 1e5) / 1e5,
-          precision: Math.round(p.coords.accuracy),
-        }),
-      (e) => res({ refus: e.code === 1, erreur: e.code !== 1 ? e.message : undefined }),
-      { timeout: 8000, maximumAge: 60000, enableHighAccuracy: false },
-    ),
-  );
+const pad = (n) => String(n).padStart(2, "0");
+const pauseLabel = (m) => (m ? (m >= 60 ? fmtH(m) : m + " min") : "Pas de pause");
+function nomJour(d, today) {
+  if (d === today) return "Aujourd'hui";
+  if (d === joursRecents(today, 2)[1]) return "Hier";
+  return fmtJour(d);
 }
 
-async function punch(ctx, action, extra = {}) {
-  const at = extra.at || nowIso();
-  const data = { contratId: ctx.meta.currentContrat, action, at, ...extra };
-  if (!extra.manuel && ctx.meta.gps) data.gps = await getGps();
-  const r = await ctx.append("punch", data);
-  ctx.toast(`${LABELS[action]} scellé à ${fmtHeure(at)} · #${r.hash.slice(0, 8)}`);
-  if (navigator.vibrate) navigator.vibrate(60);
-  await ctx.refresh();
+/** Deux listes (heures 0-23, minutes de 5 en 5) : toujours en 24 h, quel que soit le téléphone. */
+function heureChamp(id, label, hhmm) {
+  const [h, m] = (hhmm || "08:00").split(":").map(Number);
+  const mins = [...new Set([...Array.from({ length: 12 }, (_, k) => k * 5), m])].sort((a, b) => a - b);
+  return `<div><span class="lbl">${label}</span><div class="hm">
+      <select id="${id}-h" aria-label="${label} : heure">${Array.from({ length: 24 }, (_, k) => `<option value="${pad(k)}" ${k === h ? "selected" : ""}>${pad(k)} h</option>`).join("")}</select>
+      <select id="${id}-m" aria-label="${label} : minutes">${mins.map((k) => `<option value="${pad(k)}" ${k === m ? "selected" : ""}>${pad(k)}</option>`).join("")}</select>
+    </div></div>`;
 }
+const lireHeure = (el, id) => `${el.querySelector(`#${id}-h`).value}:${el.querySelector(`#${id}-m`).value}`;
 
-export function correctionDialog(ctx, item) {
-  ctx.dialog(
-    `<h2>Corriger ce pointage</h2>
-    <p class="muted">On ne réécrit jamais : la correction est <b>ajoutée</b> et scellée, l'original reste visible.</p>
-    <p>Original : <b>${LABELS[item.original.action]} à ${fmtHeure(item.original.at)}</b> le ${fmtJour(parisDate(item.original.at))}</p>
-    <label for="c-at">Heure exacte</label><input id="c-at" type="datetime-local" value="${isoToParisLocal(item.at)}">
-    <label class="check"><input id="c-annule" type="checkbox"><span>Annuler ce pointage (erreur de bouton)</span></label>
-    <label for="c-motif">Motif (obligatoire)</label><input id="c-motif" type="text" placeholder="Ex. : oubli, sortie réelle à 17 h 15">
-    <button class="btn primary" id="c-ok">Ajouter la correction</button><button class="btn ghost" id="c-x">Fermer</button>`,
-    (d) => {
-      d.querySelector("#c-x").onclick = () => d.close();
-      d.querySelector("#c-ok").onclick = async () => {
-        const motif = d.querySelector("#c-motif").value.trim();
-        if (!motif) return ctx.toast("Indiquez un motif : c'est ce qui rend la correction crédible.", true);
-        const annule = d.querySelector("#c-annule").checked;
-        const at = parisLocalToIso(d.querySelector("#c-at").value);
-        await ctx.append("correction", {
-          targetId: item.id,
-          motif,
-          ...(annule ? { annule: true } : { changes: { at } }),
-        });
-        d.close();
-        ctx.toast("Correction scellée.");
-        ctx.refresh();
-      };
-    },
-  );
-}
-
-function oubliDialog(ctx) {
-  ctx.dialog(
-    `<h2>Ajouter un pointage oublié</h2>
-    <p class="muted">Il sera marqué « ajouté après coup », avec votre motif.</p>
-    <label for="o-act">Type</label><select id="o-act">${Object.entries(LABELS)
-      .map(([k, v]) => `<option value="${k}">${v}</option>`)
-      .join("")}</select>
-    <label for="o-at">Date et heure (heure de Paris)</label><input id="o-at" type="datetime-local" value="${isoToParisLocal(nowIso())}">
-    <label for="o-motif">Motif (obligatoire)</label><input id="o-motif" type="text" placeholder="Ex. : téléphone déchargé">
-    <button class="btn primary" id="o-ok">Ajouter et sceller</button><button class="btn ghost" id="o-x">Fermer</button>`,
-    (d) => {
-      d.querySelector("#o-x").onclick = () => d.close();
-      d.querySelector("#o-ok").onclick = async () => {
-        const motif = d.querySelector("#o-motif").value.trim();
-        if (!motif) return ctx.toast("Indiquez un motif.", true);
-        d.close();
-        await punch(ctx, d.querySelector("#o-act").value, {
-          at: parisLocalToIso(d.querySelector("#o-at").value),
-          manuel: true,
-          motif,
-        });
-      };
-    },
-  );
-}
-
-function timelineHtml(ctx, dayStr) {
-  const c = ctx.state.contrats.get(ctx.meta.currentContrat);
-  const items = ctx.state.allPunches
-    .filter((p) => p.contratId === c.id && parisDate(p.at) === dayStr)
-    .sort((a, b) => (a.at < b.at ? -1 : 1));
-  if (!items.length) {
-    return `<p class="muted">Aucun pointage ${dayStr === parisDate(nowIso()) ? "aujourd'hui" : "ce jour-là"}.</p>`;
-  }
-  const j = items.find((p) => p.journee && !p.annule);
-  return `${j ? `<p class="small muted">${esc(j.motif)}.</p>` : ""}<ul class="timeline">${items
-    .map((p) => {
-      const corr = p.corrections.length ? p.corrections[p.corrections.length - 1] : null;
-      return `<li><span class="dot ${p.action}"></span><span class="t num ${p.annule ? "strike" : ""}">${fmtHeure(p.at)}</span>
-      <div class="grow"><b>${LABELS[p.action]}</b> ${p.journee ? '<span class="tag">journée saisie</span>' : p.manuel ? '<span class="tag warn">ajouté après coup</span>' : ""} ${p.annule ? '<span class="tag bad">annulé</span>' : corr ? '<span class="tag warn">corrigé</span>' : ""}
-      ${corr && !p.annule ? `<div class="small muted">d'abord <span class="strike">${fmtHeure(p.original.at)}</span> · ${esc(corr.motif)}</div>` : ""}
-      ${p.annule && corr ? `<div class="small muted">${esc(corr.motif)}</div>` : ""}
-      ${p.manuel && p.motif && !p.journee ? `<div class="small muted">${esc(p.motif)}</div>` : ""}
-      <div class="hash">#${p.hash.slice(0, 16)}${p.gps && p.gps.lat ? " · 📍 " + p.gps.lat + ", " + p.gps.lon : p.gps && p.gps.refus ? " · lieu refusé" : ""}</div></div>
-      ${p.annule ? "" : `<button class="btn sm" data-corr="${p.id}">Corriger</button>`}</li>`;
-    })
-    .join("")}</ul>`;
-}
-
-const PAUSES = [0, 15, 30, 45, 60, 90, 120];
-
-function journeeCard(ctx, today) {
-  const j = ctx.meta.journee || { debut: "07:30", fin: "16:30", pauseMin: 60 };
+function journeeCard(ctx, today, jour, existant) {
+  const def = ctx.meta.journee || { debut: "07:30", fin: "16:30", pauseMin: 60 };
+  const v =
+    existant && !existant.supprimee
+      ? {
+          debut: existant.arrivee || def.debut,
+          fin: existant.depart || def.fin,
+          pauseMin: existant.depart ? existant.pauseMin : def.pauseMin,
+        }
+      : def;
+  const pauses = [...new Set([...PAUSES, Number(v.pauseMin) || 0])].sort((a, b) => a - b);
+  const jours = joursRecents(today, 21);
+  if (!jours.includes(jour)) jours.push(jour);
+  const modif = existant && !existant.supprimee;
   return `<div class="card" id="journee">
       <h2>Ma journée</h2>
-      <p class="muted small">Le plus simple : notez le début, la fin et la pause, une fois par jour. Vous pouvez aussi pointer en direct plus bas.</p>
-      <label for="j-date">Jour</label><input id="j-date" type="date" value="${today}" max="${today}">
-      <div class="grid2">
-        <div><label for="j-debut">Début</label><input id="j-debut" type="time" value="${esc(j.debut)}"></div>
-        <div><label for="j-fin">Fin</label><input id="j-fin" type="time" value="${esc(j.fin)}"></div>
-      </div>
-      <label for="j-pause">Pause (non payée)</label><select id="j-pause">${PAUSES.map((m) => `<option value="${m}" ${m === Number(j.pauseMin) ? "selected" : ""}>${m ? (m >= 60 ? fmtH(m) : m + " min") : "Pas de pause"}</option>`).join("")}</select>
-      <p class="kpi" style="margin:.6rem 0"><span class="l">Heures travaillées</span> <span class="v num" id="j-total">—</span></p>
+      <label for="j-date">Jour</label><select id="j-date">${jours.map((d) => `<option value="${d}" ${d === jour ? "selected" : ""}>${esc(nomJour(d, today))}</option>`).join("")}</select>
+      <div class="grid2">${heureChamp("j-debut", "Arrivée", v.debut)}${heureChamp("j-fin", "Départ", v.fin)}</div>
+      <label for="j-pause">Pause (non payée)</label><select id="j-pause">${pauses.map((m) => `<option value="${m}" ${m === Number(v.pauseMin) ? "selected" : ""}>${pauseLabel(m)}</option>`).join("")}</select>
+      <div class="total-jour"><span>Total travaillé</span><b class="num" id="j-total">—</b></div>
+      ${
+        modif
+          ? `${existant.aVerifier ? `<p class="note bad">Départ manquant : complétez la journée.</p>` : ""}
+      <label for="j-motif">Pourquoi ce changement ?</label><input id="j-motif" type="text" value="${existant.aVerifier ? "Journée complétée" : ""}" placeholder="Ex. : parti à 17 h">`
+          : ""
+      }
       <p class="note bad" id="j-err" hidden></p>
-      <button class="btn primary" id="j-ok">Enregistrer ma journée</button>
+      <button class="btn primary big" id="j-ok">${modif ? "ENREGISTRER LA MODIFICATION" : "ENREGISTRER MA JOURNÉE"}</button>
+      ${modif ? `<button class="btn ghost" id="j-suppr">Supprimer cette journée</button>` : ""}
     </div>`;
 }
 
-function bindJournee(ctx, el, c) {
-  const $ = (id) => el.querySelector(id);
+function faitCard(today, jour, j) {
+  return `<div class="card" id="journee">
+      <h2>Ma journée</h2>
+      <p class="fait">✅ <b>${esc(nomJour(jour, today))}</b> : ${esc(j.arrivee || "?")} → ${esc(j.depart || "?")}${j.pauseMin ? ", pause " + pauseLabel(j.pauseMin) : ""}</p>
+      <div class="total-jour"><span>Total travaillé</span><b class="num">${fmtH(j.minutes)}</b></div>
+      <div class="grid2"><button class="btn" id="j-modif">Modifier</button><button class="btn primary" id="j-autre">Noter un autre jour</button></div>
+    </div>`;
+}
+
+async function enregistrer(ctx, c, j, r, existant, motifModif) {
+  if (existant && !existant.supprimee) {
+    for (const id of existant.ids) await ctx.append("correction", { targetId: id, motif: motifModif, annule: true });
+  }
+  const base = motifJournee(j.pauseMin);
+  const motif = existant && !existant.supprimee ? `${base}. Modification : ${motifModif}` : base;
+  for (const p of r.punches) {
+    await ctx.append("punch", { contratId: c.id, action: p.action, at: p.at, manuel: true, journee: true, motif });
+  }
+}
+
+function bindJournee(ctx, el, c, existant) {
+  const $ = (s) => el.querySelector(s);
   const lire = () => ({
     date: $("#j-date").value,
-    debut: $("#j-debut").value,
-    fin: $("#j-fin").value,
+    debut: lireHeure(el, "j-debut"),
+    fin: lireHeure(el, "j-fin"),
     pauseMin: Number($("#j-pause").value),
   });
-  const dejaPointe = (date) =>
-    ctx.state.allPunches.some((p) => p.contratId === c.id && !p.annule && parisDate(p.at) === date);
   const maj = () => {
-    const j = lire();
-    const r = journeePunches(j);
-    const err = $("#j-err");
+    const r = journeePunches(lire());
     $("#j-total").textContent = r.ok ? fmtH(r.minutes) : "—";
-    const msg = !r.ok
-      ? r.erreur
-      : dejaPointe(j.date)
-        ? "Ce jour a déjà des pointages : corrigez-les dans la liste plus bas."
-        : "";
-    err.hidden = !msg;
-    err.textContent = msg;
-    $("#j-ok").disabled = !!msg;
-    return r.ok && !msg ? r : null;
+    const err = $("#j-err");
+    err.hidden = r.ok;
+    err.textContent = r.ok ? "" : r.erreur;
+    $("#j-ok").disabled = !r.ok;
+    return r.ok ? r : null;
   };
-  ["#j-date", "#j-debut", "#j-fin", "#j-pause"].forEach((id) => ($(id).oninput = maj));
+  el.querySelectorAll("#journee select").forEach((s) => {
+    if (s.id !== "j-date") s.onchange = maj;
+  });
+  $("#j-date").onchange = () => {
+    ui.jour = $("#j-date").value;
+    ui.edit = false;
+    ctx.go("pointer");
+  };
   maj();
+  const motifOk = () => {
+    const m = $("#j-motif") ? $("#j-motif").value.trim() : "";
+    if ($("#j-motif") && !m) {
+      ctx.toast("Indiquez pourquoi.", true);
+      return null;
+    }
+    return m;
+  };
   $("#j-ok").onclick = async (e) => {
     const r = maj();
     if (!r) return;
+    const m = motifOk();
+    if (m === null) return;
     e.currentTarget.disabled = true;
     const j = lire();
-    const motif = motifJournee(j.pauseMin);
-    for (const p of r.punches) {
-      await ctx.append("punch", { contratId: c.id, action: p.action, at: p.at, manuel: true, journee: true, motif });
-    }
+    await enregistrer(ctx, c, j, r, existant, m);
     await ctx.setMeta("journee", { debut: j.debut, fin: j.fin, pauseMin: j.pauseMin });
     if (navigator.vibrate) navigator.vibrate(60);
-    ctx.toast(`Journée du ${fmtJour(j.date)} enregistrée : ${fmtH(r.minutes)}. Scellée.`);
+    ctx.toast(`${nomJour(j.date, parisDate(nowIso()))} : ${fmtH(r.minutes)} enregistrées.`);
+    ui.semaine = weekKey(j.date);
+    ui.jour = j.date;
+    ui.edit = false;
     ctx.refresh();
   };
+  const sup = $("#j-suppr");
+  if (sup) {
+    sup.onclick = async () => {
+      const m = motifOk();
+      if (m === null) return;
+      for (const id of existant.ids) await ctx.append("correction", { targetId: id, motif: m, annule: true });
+      ui.edit = false;
+      ctx.toast("Journée supprimée.");
+      ctx.refresh();
+    };
+  }
+}
+
+function semaineCard(c, punches, lundi, today) {
+  const jours = joursDeSemaine(lundi);
+  const { rows } = splitWeekly(minutesByDay(workIntervals(punches).intervals), c);
+  const r = rows.filter((x) => x.week === lundi);
+  const parJour = new Map(r.map((x) => [x.date, x.total]));
+  const s = sumRows(r);
+  const sup = s.hs1 + s.hs2 + s.hc1 + s.hc2;
+  return `<div class="card" id="semaine">
+      <div class="row"><button class="btn sm" id="s-prev" aria-label="Semaine précédente">‹</button>
+        <h2 class="grow" style="text-align:center;margin:0">Ma semaine<br><span class="small muted">${jours[0].slice(8)}/${jours[0].slice(5, 7)} → ${jours[6].slice(8)}/${jours[6].slice(5, 7)}</span></h2>
+        <button class="btn sm" id="s-next" aria-label="Semaine suivante" ${weekKey(today) === lundi ? "disabled" : ""}>›</button></div>
+      <table class="semaine">${jours
+        .map(
+          (d, k) =>
+            `<tr data-jour="${d}" class="${d === today ? "auj" : ""}"><td>${JOURS_NOMS[k]}</td><td class="r num">${parJour.get(d) ? fmtH(parJour.get(d)) : d > today ? "" : "—"}</td></tr>`,
+        )
+        .join("")}
+        <tr class="tot"><td>Total</td><td class="r num" id="s-total">${fmtH(s.total)}</td></tr>
+        ${sup ? `<tr><td>${c.hebdo < 35 ? "dont heures compl. et sup" : "dont heures sup"}</td><td class="r num" style="color:var(--amber)">${fmtH(sup)}</td></tr>` : ""}
+      </table>
+    </div>`;
+}
+
+function historiqueCard(journees, today) {
+  if (!journees.length) return "";
+  return `<details class="card" id="historique"><summary style="min-height:48px;display:flex;align-items:center"><b>Mes journées (${journees.filter((j) => !j.supprimee).length})</b></summary>
+      <ul class="jours">${journees
+        .slice(0, 60)
+        .map(
+          (j) => `<li data-jour="${j.date}" class="${j.supprimee ? "strike" : ""}">
+          <div class="grow"><b>${esc(nomJour(j.date, today))}</b>
+            <div class="small muted">${j.supprimee ? "supprimée" : `${esc(j.arrivee || "?")} → ${esc(j.depart || "?")}${j.pauseMin ? " · pause " + pauseLabel(j.pauseMin) : ""}`}
+            ${j.aVerifier && !j.supprimee ? ' <span class="tag warn">à vérifier</span>' : ""}${j.modifiee ? ' <span class="tag warn">modifiée</span>' : ""}</div>
+            ${j.motifs.length ? `<div class="small dim">${j.motifs.map(esc).join(" · ")}</div>` : ""}</div>
+          <b class="num">${j.supprimee ? "" : fmtH(j.minutes)}</b></li>`,
+        )
+        .join("")}</ul>
+    </details>`;
 }
 
 function appUrl() {
@@ -218,129 +216,92 @@ function appUrl() {
 function rappelCard(ctx, today) {
   const heure = ctx.meta.rappelHeure || "19:00";
   const [soir, mois] = rappelsParDefaut({ date: today, heure, appUrl: appUrl() });
-  return `<details class="card" id="rappel"><summary style="min-height:48px;display:flex;align-items:center"><b>🔔 Me rappeler le soir de noter mes heures</b></summary>
-      <p class="small muted">Une appli sans serveur ne peut pas envoyer de notification à heure fixe de façon fiable. Le rappel passe donc par l'agenda de votre téléphone, qui sonne tout seul.</p>
-      <label for="r-heure">Heure du rappel</label><input id="r-heure" type="time" value="${esc(heure)}">
-      <a class="btn primary" id="r-soir" target="_blank" rel="noopener" href="${esc(googleAgendaUrl({ ...soir }))}">Rappel chaque soir (lun.-ven.) dans Google Agenda</a>
-      <a class="btn" id="r-mois" target="_blank" rel="noopener" href="${esc(googleAgendaUrl({ ...mois }))}">Rappel le dernier jour du mois : vérifier ma paie</a>
-      <button class="btn ghost" id="r-ics">Autre agenda : télécharger les 2 rappels (.ics)</button>
-      <p class="small dim">Google Agenda s'ouvre avec le rappel déjà rempli : appuyez sur « Enregistrer ». Aucune donnée de paie n'est envoyée, seulement le titre et l'heure.</p>
+  return `<details class="card" id="rappel"><summary style="min-height:48px;display:flex;align-items:center"><b>🔔 Rappel du soir</b></summary>
+      ${heureChamp("r-heure", "Heure du rappel", heure)}
+      <a class="btn primary" id="r-soir" target="_blank" rel="noopener" href="${esc(googleAgendaUrl(soir))}">Rappel chaque soir</a>
+      <a class="btn" id="r-mois" target="_blank" rel="noopener" href="${esc(googleAgendaUrl(mois))}">Rappel en fin de mois</a>
+      <button class="btn ghost" id="r-ics">Autre agenda (.ics)</button>
     </details>`;
 }
 
 function bindRappel(ctx, el, today) {
-  const h = el.querySelector("#r-heure");
-  if (!h) return;
-  const maj = () => {
-    const [soir, mois] = rappelsParDefaut({ date: today, heure: h.value || "19:00", appUrl: appUrl() });
+  const lire = () => lireHeure(el, "r-heure");
+  const maj = async () => {
+    const [soir, mois] = rappelsParDefaut({ date: today, heure: lire(), appUrl: appUrl() });
     el.querySelector("#r-soir").href = googleAgendaUrl(soir);
     el.querySelector("#r-mois").href = googleAgendaUrl(mois);
+    await ctx.setMeta("rappelHeure", lire());
   };
-  h.onchange = async () => {
-    maj();
-    await ctx.setMeta("rappelHeure", h.value || "19:00");
-  };
+  el.querySelector("#r-heure-h").onchange = maj;
+  el.querySelector("#r-heure-m").onchange = maj;
   el.querySelector("#r-ics").onclick = () => {
-    const ics = rappelsIcs(rappelsParDefaut({ date: today, heure: h.value || "19:00", appUrl: appUrl() }));
+    const ics = rappelsIcs(rappelsParDefaut({ date: today, heure: lire(), appUrl: appUrl() }));
     downloadBlob("paie-juste-rappels.ics", new Blob([ics], { type: "text/calendar" }));
-    ctx.toast("Fichier enregistré : ouvrez-le pour l'ajouter à votre agenda.");
+    ctx.toast("Fichier enregistré.");
   };
 }
 
 export default {
   id: "pointer",
-  label: "Pointer",
-  unmount() {
-    clearInterval(tick);
-  },
+  label: "Mes heures",
   render(ctx, el) {
-    clearInterval(tick);
     const c = ctx.state.contrats.get(ctx.meta.currentContrat);
     if (!c) {
-      el.innerHTML = `<div class="card"><h2>Bienvenue, chef 👷</h2><p>Paie Juste pointe vos heures, vérifie votre fiche de paie et prépare votre réclamation. <b>Tout reste sur ce téléphone.</b></p>
+      el.innerHTML = `<div class="card"><h2>Bienvenue, chef 👷</h2><p>Je travaille, je note mes heures, Paie Juste vérifie ma paie. <b>Tout reste sur ce téléphone.</b></p>
         <button class="btn primary" id="go-c">Ajouter mon contrat</button><button class="btn" id="go-demo">Voir l'exemple (données fictives)</button></div>`;
       el.querySelector("#go-c").onclick = () => ctx.go("contrat");
       el.querySelector("#go-demo").onclick = () => ctx.setDemo(true);
       return;
     }
-    const n = liveNumbers(ctx);
-    const days = [...new Set(ctx.state.allPunches.filter((p) => p.contratId === c.id).map((p) => parisDate(p.at)))]
-      .sort()
-      .reverse();
-    const dayShown = days.includes(n.today) || !days.length ? n.today : days[0];
-    const btn =
-      n.etat === "idle"
-        ? { cls: "go", txt: "DÉBUT", sub: "Commencer la journée", act: "debut" }
-        : n.etat === "work"
-          ? { cls: "pause", txt: "PAUSE", sub: "Mettre en pause", act: "pause" }
-          : { cls: "resume", txt: "REPRENDRE", sub: "Fin de la pause", act: "reprise" };
+    const today = parisDate(nowIso());
+    const punches = ctx.state.punches.filter((p) => p.contratId === c.id);
+    const tous = ctx.state.allPunches.filter((p) => p.contratId === c.id);
+    const journees = resumeJournees(punches, tous);
+    const jour = ui.jour || today;
+    const existant = journees.find((j) => j.date === jour);
+    const lundi = ui.semaine || weekKey(today);
     const heureParis = Number(isoToParisLocal(nowIso()).slice(11, 13));
-    const rien = !days.includes(n.today);
+    const rienAujourdhui = !journees.some((j) => j.date === today && !j.supprimee);
     el.innerHTML = `
       ${contratSelect(ctx)}
-      ${n.etat === "idle" && rien && heureParis >= 17 ? `<p class="note" id="j-oubli">Vous n'avez pas encore noté vos heures aujourd'hui.</p>` : ""}
-      ${n.etat === "idle" ? journeeCard(ctx, n.today) : ""}
-      <button class="btn" id="go-paie">📄 Voir le détail de mon salaire du mois</button>
-      ${n.etat === "idle" ? `<h3 class="muted" style="margin:1rem 0 .3rem">Ou pointer en direct</h3>` : ""}
-      <div class="card ${n.etat === "work" ? "working" : ""}">
-        <div class="row"><span class="tag">${esc(contratLabel(c))}</span></div>
-        <div class="clock ${n.etat}">
-          <p><span class="state"><i></i>${n.etat === "work" ? "Au travail" : n.etat === "pause" ? "En pause" : "Pas pointé"}</span></p>
-          <div class="big num" id="live-today">${hms(n.secToday)}</div>
-          <div class="sub">aujourd'hui</div>
-        </div>
-        <div class="bigbtn-wrap"><span class="ring"></span><span class="ring r2"></span>
-          <button class="bigbtn ${btn.cls}" id="b-main">${btn.txt}<small>${btn.sub}</small></button></div>
-        ${n.etat !== "idle" ? `<button class="btn stop" id="b-fin">FIN de journée</button>` : ""}
-        <div class="grid2" style="margin-top:.9rem">
-          <div class="kpi"><div class="l">Semaine</div><div class="v num" id="live-week">${fmtH(n.wk.total)}</div></div>
-          <div class="kpi"><div class="l">${c.hebdo < 35 ? "Compl. + sup" : "Heures sup"}</div><div class="v num" style="color:var(--amber)" id="live-hs">${fmtH(n.wk.hs1 + n.wk.hs2 + n.wk.hc1 + n.wk.hc2)}</div></div>
-        </div>
-        <label class="check"><input type="checkbox" id="gps" ${ctx.meta.gps ? "checked" : ""}><span>Ajouter ma position GPS à chaque pointage <span class="hint">(facultatif ; vous pouvez refuser, le pointage est quand même enregistré)</span></span></label>
-      </div>
-      <div class="card"><div class="row"><h3 class="grow">${dayShown === n.today ? "Aujourd'hui" : fmtJour(dayShown)}</h3>
-        ${days.length > 1 ? `<select id="day" class="day-select" aria-label="Jour affiché">${days.map((d) => `<option value="${d}" ${d === dayShown ? "selected" : ""}>${fmtJour(d)}</option>`).join("")}</select>` : ""}</div>
-        <div id="tl">${timelineHtml(ctx, dayShown)}</div>
-        <button class="btn" id="b-oubli">＋ Pointage oublié</button></div>
-      ${rappelCard(ctx, n.today)}
-      <p class="small dim">Chaque pointage est scellé par une empreinte SHA-256 qui inclut celle du précédent : toute modification après coup se voit. Ce n'est pas une preuve certifiée.</p>`;
+      ${rienAujourdhui && heureParis >= 17 ? `<p class="note" id="j-oubli">Heures du jour pas encore notées.</p>` : ""}
+      ${existant && !existant.supprimee && !existant.aVerifier && !ui.edit ? faitCard(today, jour, existant) : journeeCard(ctx, today, jour, existant)}
+      ${semaineCard(c, punches, lundi, today)}
+      <button class="btn" id="go-paie">📄 Mon salaire du mois</button>
+      ${historiqueCard(journees, today)}
+      ${rappelCard(ctx, today)}`;
     bindContratSelect(ctx, el);
-    if (n.etat === "idle") bindJournee(ctx, el, c);
-    bindRappel(ctx, el, n.today);
+    if (el.querySelector("#j-modif")) {
+      el.querySelector("#j-modif").onclick = () => {
+        ui.jour = jour;
+        ui.edit = true;
+        ctx.go("pointer");
+      };
+      el.querySelector("#j-autre").onclick = () => {
+        const libre = joursRecents(today, 21).find((d) => !journees.some((j) => j.date === d && !j.supprimee));
+        ui.jour = libre || joursRecents(today, 2)[1];
+        ui.edit = false;
+        ctx.go("pointer");
+      };
+    } else bindJournee(ctx, el, c, existant);
+    bindRappel(ctx, el, today);
     el.querySelector("#go-paie").onclick = () => ctx.go("paie");
-    el.querySelector("#b-main").onclick = (e) => {
-      e.currentTarget.disabled = true;
-      punch(ctx, btn.act);
+    const decale = (n) => {
+      const [y, m, d] = lundi.split("-").map(Number);
+      ui.semaine = new Date(Date.UTC(y, m - 1, d + 7 * n)).toISOString().slice(0, 10);
+      ctx.go("pointer");
     };
-    const f = el.querySelector("#b-fin");
-    if (f) {
-      f.onclick = (e) => {
-        e.currentTarget.disabled = true;
-        punch(ctx, "fin");
+    el.querySelector("#s-prev").onclick = () => decale(-1);
+    el.querySelector("#s-next").onclick = () => decale(1);
+    el.querySelectorAll("[data-jour]").forEach((row) => {
+      if (row.dataset.jour > today) return;
+      row.style.cursor = "pointer";
+      row.onclick = () => {
+        ui.jour = row.dataset.jour;
+        ui.edit = false;
+        ctx.go("pointer");
+        document.querySelector("#journee")?.scrollIntoView({ behavior: "smooth", block: "start" });
       };
-    }
-    el.querySelector("#gps").onchange = (e) => ctx.setMeta("gps", e.target.checked);
-    el.querySelector("#b-oubli").onclick = () => oubliDialog(ctx);
-    const bindTl = () =>
-      el
-        .querySelectorAll("[data-corr]")
-        .forEach((b) => (b.onclick = () => correctionDialog(ctx, ctx.state.items.get(b.dataset.corr))));
-    bindTl();
-    const ds = el.querySelector("#day");
-    if (ds) {
-      ds.onchange = () => {
-        el.querySelector("#tl").innerHTML = timelineHtml(ctx, ds.value);
-        bindTl();
-      };
-    }
-    if (n.etat === "work") {
-      tick = setInterval(() => {
-        const m = liveNumbers(ctx);
-        const a = el.querySelector("#live-today");
-        if (a) a.textContent = hms(m.secToday);
-        const w = el.querySelector("#live-week");
-        if (w) w.textContent = fmtH(m.wk.total);
-      }, 1000);
-    }
+    });
   },
 };

@@ -21,7 +21,16 @@ import { parseContrat } from "../js/contrat-parse.js";
 import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
 import { parisLocalToIso } from "../js/util.js";
-import { journeePunches, motifJournee, googleAgendaUrl, rappelsIcs, rappelsParDefaut } from "../js/journee.js";
+import {
+  journeePunches,
+  motifJournee,
+  googleAgendaUrl,
+  rappelsIcs,
+  rappelsParDefaut,
+  resumeJournees,
+  joursDeSemaine,
+  joursRecents,
+} from "../js/journee.js";
 import fs from "node:fs";
 import path from "node:path";
 import { runRules } from "./rules.mjs";
@@ -412,6 +421,45 @@ console.log("=== 22. Saisie simple de la journée et rappels ===");
     ".ics : fins de ligne CRLF et lien de l'appli",
   );
   t(!/€|salaire brut|@/.test(ics.replaceAll("@paie-juste", "")), ".ics : aucune donnée de paie");
+}
+
+console.log("=== 23. Mes journées et ma semaine ===");
+{
+  const mk = (date, debut, fin, pauseMin, extra = {}) =>
+    journeePunches({ date, debut, fin, pauseMin }).punches.map((p, k) => ({
+      id: date + k,
+      ...p,
+      corrections: [],
+      ...extra,
+    }));
+  const lun = mk("2026-11-09", "07:30", "16:30", 60);
+  const mar = mk("2026-11-10", "08:00", "12:00", 0);
+  const r = resumeJournees([...lun, ...mar]);
+  t(r.length === 2 && r[0].date === "2026-11-10", "une ligne par jour, la plus récente d'abord");
+  const l = r.find((x) => x.date === "2026-11-09");
+  t(
+    l.arrivee === "07:30" && l.depart === "16:30" && l.pauseMin === 60 && l.minutes === 480,
+    "lundi : 07:30 → 16:30, pause 1 h, 8 h",
+  );
+  t(!l.aVerifier && !l.modifiee && !l.supprimee, "lundi : complet, non modifié");
+  const incomplet = resumeJournees([
+    { id: "x", action: "debut", at: parisLocalToIso("2026-11-11T07:30"), corrections: [] },
+  ]);
+  t(incomplet[0].aVerifier && incomplet[0].depart === "", "départ manquant → « à vérifier »");
+  const annules = lun.map((p) => ({ ...p, annule: true, corrections: [{ motif: "parti à 17 h" }] }));
+  const neuf = mk("2026-11-09", "07:30", "17:00", 60).map((p) => ({ ...p, id: "n" + p.id }));
+  const m = resumeJournees(neuf, [...annules, ...neuf]).find((x) => x.date === "2026-11-09");
+  t(
+    m.minutes === 510 && m.modifiee && m.motifs.includes("parti à 17 h"),
+    "modification : nouveau total et motif gardé",
+  );
+  const s = resumeJournees([], annules).find((x) => x.date === "2026-11-09");
+  t(s.supprimee && s.minutes === 0, "journée supprimée : reste visible, à 0 h");
+  const sem = joursDeSemaine("2026-11-09");
+  t(sem.length === 7 && sem[0] === "2026-11-09" && sem[6] === "2026-11-15", "semaine du lundi au dimanche");
+  t(joursDeSemaine("2026-10-26")[6] === "2026-11-01", "semaine à cheval sur deux mois");
+  const rec = joursRecents("2026-03-01", 3);
+  t(rec.join() === "2026-03-01,2026-02-28,2026-02-27", "jours récents : passage de mois");
 }
 
 runRules(t, eq);
