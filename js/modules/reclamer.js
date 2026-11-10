@@ -1,4 +1,12 @@
-import { lettreAmiable, miseEnDemeure, annexeReleve, CONTACTS, CONTACTS_NOTE, NOT_LEGAL_ADVICE } from "../letters.js";
+import {
+  lettreAmiable,
+  miseEnDemeure,
+  demandeAccesRgpd,
+  annexeReleve,
+  CONTACTS,
+  CONTACTS_NOTE,
+  NOT_LEGAL_ADVICE,
+} from "../letters.js";
 import { fmtEur, parisDate } from "../calc.js";
 import { esc, fmtParis, nowIso } from "../util.js";
 import { currentCompute, periodLabel } from "./paie.js";
@@ -56,7 +64,14 @@ export default {
       el.innerHTML = `<div class="card"><h2>Réclamer</h2><p>Ajoutez d'abord votre contrat et vos heures.</p></div>`;
       return;
     }
-    const txt = ui.type === "amiable" ? lettreAmiable(L) : ui.type === "med" ? miseEnDemeure(L) : annexeReleve(L);
+    const txt =
+      ui.type === "amiable"
+        ? lettreAmiable(L)
+        : ui.type === "med"
+          ? miseEnDemeure(L)
+          : ui.type === "rgpd"
+            ? demandeAccesRgpd(L)
+            : annexeReleve(L);
     const p = L.profil;
     el.innerHTML = `${contratSelect(ctx)}
       <div class="note bad"><b>Ce n'est pas un conseil juridique.</b> L'appli prépare des brouillons. Rien n'est envoyé automatiquement : vous relisez, vous signez, vous envoyez vous-même.</div>
@@ -66,7 +81,9 @@ export default {
       <div class="seg-ctl" role="group" aria-label="Type de courrier">
         <button data-t="amiable" aria-pressed="${ui.type === "amiable"}">① Demande amiable</button>
         <button data-t="med" aria-pressed="${ui.type === "med"}">② Mise en demeure</button>
-        <button data-t="annexe" aria-pressed="${ui.type === "annexe"}">③ Relevé scellé</button></div>
+        <button data-t="annexe" aria-pressed="${ui.type === "annexe"}">③ Relevé scellé</button>
+        <button data-t="rgpd" aria-pressed="${ui.type === "rgpd"}">④ Mes données (RGPD)</button></div>
+      ${ui.type === "rgpd" ? `<p class="note">Pour obtenir de l'employeur ou de l'agence les relevés d'heures et éléments de paie qu'ils ont sur vous. Ce courrier ne réclame aucun montant : vous pouvez l'envoyer même sans écart chiffré.</p>` : ""}
       ${ui.type === "med" ? `<div class="grid2"><div><label for="r-am">Date de la demande amiable</label><input id="r-am" type="date" value="${ui.amiableDate}"></div><div><label for="r-del">Délai (jours)</label><input id="r-del" type="number" value="${ui.delai}"></div></div>` : ""}
       <div class="paper" id="paper" style="margin-top:.8rem">${esc(txt)}</div>
       <div class="grid2"><button class="btn primary" id="r-copy">Copier</button><button class="btn" id="r-print">Imprimer / PDF</button></div>
@@ -118,7 +135,8 @@ export default {
         ctx.toast("Texte sélectionné : appuyez sur Copier.", true);
       }
     };
-    el.querySelector("#r-print").onclick = () => ctx.print(ui.type === "annexe" ? txt : txt + "\f" + annexeReleve(L));
+    el.querySelector("#r-print").onclick = () =>
+      ctx.print(ui.type === "annexe" || ui.type === "rgpd" ? txt : txt + "\f" + annexeReleve(L));
     el.querySelector("#pf-save").onclick = async () => {
       await ctx.setMeta("profil", {
         nom: el.querySelector("#pf-nom").value.trim(),

@@ -72,6 +72,17 @@ Source : [service-public F2302 « Cotisations salariales »](https://www.service
 - **Repli** : coller le texte du contrat. Chaque champ trouvé est **proposé** avec l'extrait d'origine, et rien n'est enregistré sans validation.
 - Les champs sont extraits par des **expressions régulières simples** : type, taux horaire, salaire mensuel, heures par semaine ou par mois, dates, employeur, entreprise utilisatrice, lieu, poste, convention. Une mise en page inhabituelle peut faire rater un champ.
 
+## 1 quinquies. Demande d'accès à ses données (RGPD) — PROUVÉ
+
+Source : [règlement (UE) 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr), articles 12 et 15, et pages de la CNIL [« L'accès à son dossier professionnel »](https://www.cnil.fr/fr/lacces-son-dossier-professionnel) et [« Exercer son droit d'accès »](https://www.cnil.fr/fr/modele/courrier/exercer-son-droit-dacces), lues par recherche le 10/11/2026.
+
+- Le salarié peut obtenir confirmation que l'employeur traite des données le concernant, et une copie de ces données (art. 15).
+- Réponse dans un mois à compter de la réception, prolongeable de deux mois si la demande est complexe, à condition d'en informer le salarié dans le premier mois (art. 12, CNIL).
+- La première copie est gratuite (art. 12 et 15, CNIL).
+- Le droit d'accès ne couvre pas les données des autres salariés (CNIL).
+- Sans réponse, plainte possible auprès de la CNIL.
+- **INCONNU** : que l'agence d'intérim conserve bien les relevés transmis par l'entreprise utilisatrice. Le courrier les demande, il ne prétend pas qu'ils existent.
+
 ## 2. INCONNU — non codé en dur, à saisir à la main
 
 | Sujet | Pourquoi INCONNU | Dans l'appli |

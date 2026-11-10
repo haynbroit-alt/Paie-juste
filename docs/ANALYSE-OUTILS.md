@@ -80,16 +80,16 @@ npm i modele-social@11.1.0 publicodes@1.10.4
 
 ## 4. Propositions, par ordre d'impact pour le coût
 
-| #   | Proposition                                                                                                                           | Impact                                         | Coût   | Risque                                                                          |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------ | ------------------------------------------------------------------------------- |
-| 1   | **Test automatique contre le moteur Urssaf** (outil de développement seulement, l'appli ne change pas)                                | Fort : protège chaque montant à chaque version | Faible | Faible. Le moteur Urssaf évolue, donc on fixe sa version.                       |
-| 2   | **Réintégrer la part employeur de la mutuelle** dans la CSG, la CRDS et le net imposable, avec la règle vérifiée sur le moteur Urssaf | Moyen : net plus juste pour qui a une mutuelle | Faible | Moyen : il faut une source officielle avant de passer la règle en PROUVÉ.       |
-| 3   | **Courrier « droit d'accès RGPD »** dans Réclamer, pour demander à l'agence ses relevés d'heures                                      | Fort, et nouveau en France pour un salarié     | Faible | Faible : on cite l'article 15 du RGPD, rien n'est envoyé automatiquement.       |
-| 4   | **Convention BTP depuis KALI** : primes de panier et de trajet par zone, au lieu de la saisie manuelle                                | Fort pour le BTP                               | Moyen  | Moyen : les montants régionaux dépendent d'accords locaux.                      |
-| 5   | **Journal multi-employeurs** (une mission = une agence + une entreprise utilisatrice)                                                 | Fort pour l'intérim                            | Moyen  | Faible                                                                          |
-| 6   | **Signature du journal** par une clé créée sur le téléphone (WebCrypto), en plus de la chaîne SHA-256                                 | Moyen : preuve plus solide                     | Moyen  | Il ne faut pas promettre de valeur juridique. La clé perdue = signature perdue. |
-| 7   | **Export « à horodater »**, déposé par l'utilisateur sur OpenTimestamps                                                               | Faible à moyen                                 | Faible | Il faut l'expliquer simplement.                                                 |
-| 8   | **Relais** : contacter une union locale ou une association de Montpellier, pour faire tester l'appli par de vrais intérimaires        | Très fort                                      | Humain | C'est à vous de choisir, et de faire la démarche.                               |
+| #   | Proposition                                                                                                                                                           | Impact                                         | Coût   | Risque                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| 1   | ✅ **Fait en 0.1.2** (`npm run test:urssaf`, lancé par la CI). **Test automatique contre le moteur Urssaf** (outil de développement seulement, l'appli ne change pas) | Fort : protège chaque montant à chaque version | Faible | Faible. Le moteur Urssaf évolue, donc on fixe sa version.                       |
+| 2   | **Réintégrer la part employeur de la mutuelle** dans la CSG, la CRDS et le net imposable, avec la règle vérifiée sur le moteur Urssaf                                 | Moyen : net plus juste pour qui a une mutuelle | Faible | Moyen : il faut une source officielle avant de passer la règle en PROUVÉ.       |
+| 3   | ✅ **Fait en 0.1.2** (Réclamer, bouton ④). **Courrier « droit d'accès RGPD »** dans Réclamer, pour demander à l'agence ses relevés d'heures                           | Fort, et nouveau en France pour un salarié     | Faible | Faible : on cite l'article 15 du RGPD, rien n'est envoyé automatiquement.       |
+| 4   | **Convention BTP depuis KALI** : primes de panier et de trajet par zone, au lieu de la saisie manuelle                                                                | Fort pour le BTP                               | Moyen  | Moyen : les montants régionaux dépendent d'accords locaux.                      |
+| 5   | **Journal multi-employeurs** (une mission = une agence + une entreprise utilisatrice)                                                                                 | Fort pour l'intérim                            | Moyen  | Faible                                                                          |
+| 6   | **Signature du journal** par une clé créée sur le téléphone (WebCrypto), en plus de la chaîne SHA-256                                                                 | Moyen : preuve plus solide                     | Moyen  | Il ne faut pas promettre de valeur juridique. La clé perdue = signature perdue. |
+| 7   | **Export « à horodater »**, déposé par l'utilisateur sur OpenTimestamps                                                                                               | Faible à moyen                                 | Faible | Il faut l'expliquer simplement.                                                 |
+| 8   | **Relais** : contacter une union locale ou une association de Montpellier, pour faire tester l'appli par de vrais intérimaires                                        | Très fort                                      | Humain | C'est à vous de choisir, et de faire la démarche.                               |
 
 ---
 
@@ -97,7 +97,12 @@ npm i modele-social@11.1.0 publicodes@1.10.4
 
 - Seul le moteur Urssaf a été **testé**. Le reste a été lu sur des sources publiques, avec des recherches web, sans ouvrir chaque dépôt.
 - Les chiffres des dépôts (étoiles, installations) changent d'une source à l'autre. Ils ne servent qu'à donner un ordre de grandeur.
-- Le test Urssaf couvre un CDI sans heures sup. Les heures sup, le temps partiel et l'intérim restent à comparer.
+- Le test Urssaf couvre un salarié non cadre, avec et sans heures sup. Le temps partiel et l'intérim (IFM, ICCP) restent à comparer.
+
+## 6. Écarts trouvés par le test automatique (0.1.2) — TESTÉ
+
+- **Heures sup, net imposable** : avec l'exonération d'impôt des heures sup, Paie Juste et l'Urssaf diffèrent de 0,10 à 0,17 € pour 8 heures sup par mois. L'écart grandit avec le montant des heures sup (environ 0,09 %). La cause n'est pas établie, donc la formule n'a pas été modifiée. Le net avant impôt, lui, concorde au centime.
+- **Cadres** : à 3 000 € brut, le net avant impôt de Paie Juste dépasse celui de l'Urssaf de 4,36 €, et le net imposable est inférieur de 42 €. Hypothèse : le moteur Urssaf inclut la prévoyance obligatoire des cadres, payée par l'employeur, qui entre dans la base de la CSG et dans le net imposable. Paie Juste ne la calcule pas : la mutuelle et la prévoyance se saisissent à la main. Ce cas n'est pas testé automatiquement tant que la règle n'est pas vérifiée sur une source officielle.
 
 ## Sources
 
