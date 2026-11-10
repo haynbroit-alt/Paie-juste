@@ -223,6 +223,55 @@ ${(ctx.profil && ctx.profil.nom) || "[Signature]"}
 ${NOT_LEGAL_ADVICE} Avant d'envoyer une mise en demeure, faites-vous relire par le service de renseignement en droit du travail (0 806 000 126) ou par un syndicat.`;
 }
 
+/** Articles du RGPD cités dans la demande d'accès (règlement (UE) 2016/679). Voir regles.md, section 1 quinquies. */
+export const RGPD = {
+  url: "https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr",
+  cnilModele: "https://www.cnil.fr/fr/modele/courrier/exercer-son-droit-dacces",
+  cnilPlainte: "https://www.cnil.fr/fr/plaintes",
+};
+
+/**
+ * Demande d'accès à ses données personnelles (article 15 du RGPD). Ne réclame aucun montant :
+ * elle sert à obtenir les relevés d'heures et éléments de paie détenus par l'employeur ou l'agence.
+ */
+export function demandeAccesRgpd(ctx) {
+  const m = ctx.mission || {};
+  const interim = m.type === "interim";
+  const heures = interim
+    ? "les relevés d'heures me concernant, y compris ceux transmis par l'entreprise utilisatrice" +
+      (m.eu ? ` (${m.eu})` : "") +
+      ", avec leur date de réception"
+    : "les relevés d'heures, pointages ou décomptes du temps de travail me concernant";
+  return `${entete(ctx)}Lettre recommandée avec accusé de réception (ou remise en main propre contre signature)
+
+Objet : demande d'accès à mes données personnelles (article 15 du RGPD)
+
+Madame, Monsieur,
+
+En application de l'article 15 du règlement (UE) 2016/679 (RGPD), je vous demande de me confirmer si vous traitez des données personnelles me concernant et, si c'est le cas, de m'en communiquer une copie.
+
+${refMission(ctx)}
+
+Je souhaite en particulier recevoir, pour cette période :
+  - ${heures} ;
+  - les éléments variables transmis pour l'établissement de ma paie (heures, primes, indemnités, absences) ;
+  - mes bulletins de paie et mon ou mes contrats ;
+  - les informations prévues à l'article 15 : finalités du traitement, destinataires, durée de conservation et source des données lorsqu'elles n'ont pas été collectées auprès de moi.
+
+Je ne demande que les données me concernant, et aucune donnée relative à d'autres salariés.
+
+Selon l'article 12 du RGPD, vous disposez d'un mois à compter de la réception de cette demande pour y répondre. Ce délai peut être prolongé de deux mois si la demande est complexe, à condition de m'en informer dans le premier mois. La première copie est gratuite (articles 12 et 15).
+
+Une copie sous forme électronique courante (PDF ou tableur) me convient.
+
+Veuillez agréer, Madame, Monsieur, mes salutations distinguées.
+
+${(ctx.profil && ctx.profil.nom) || "[Signature]"}
+
+---
+${NOT_LEGAL_ADVICE} Sans réponse dans le délai, vous pouvez adresser une plainte à la CNIL (${RGPD.cnilPlainte}). Modèle officiel de la CNIL : ${RGPD.cnilModele}`;
+}
+
 export function annexeReleve(ctx) {
   const a = ctx.annexe || {};
   const lines = (a.punches || []).map(

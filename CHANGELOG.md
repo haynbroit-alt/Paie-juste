@@ -1,5 +1,12 @@
 # Journal des changements
 
+## 0.1.2 — 2026-11-10
+
+Sans changement des montants de paie.
+
+- Onglet Réclamer : nouveau courrier « ④ Mes données (RGPD) ». Il demande à l'employeur ou à l'agence une copie des relevés d'heures et des éléments de paie (article 15 du RGPD), sans réclamer de montant.
+- Nouveau test `npm run test:urssaf` : compare le net de Paie Juste au moteur officiel de l'Urssaf (`modele-social` 11.1.0), à chaque passage de la CI. Ce moteur n'est pas embarqué dans l'application.
+
 ## 0.1.1 — 2026-11-10
 
 Durcissement, sans changement des montants de paie.

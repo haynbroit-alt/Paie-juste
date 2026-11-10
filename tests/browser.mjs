@@ -191,6 +191,13 @@ t(/AU TRAVAIL|PAS POINTÉ|EN PAUSE/.test(shots.pointer.toUpperCase()), "Pointer 
     paper.includes("mise en demeure") && paper.includes("L1251-32") && paper.includes("382,60"),
     "mise en demeure chiffrée avec articles",
   );
+  await click(p, '[data-t="rgpd"]');
+  const rgpd = await txt(p, "#paper");
+  t(
+    rgpd.includes("article 15") && rgpd.includes("un mois") && !rgpd.includes("restant dû"),
+    "demande d’accès RGPD affichée, sans montant réclamé",
+  );
+  await click(p, '[data-t="med"]');
   await wait(700);
   await p.screenshot({ path: `${OUT}/3b-mise-en-demeure.png` });
   await p.evaluate(() => {

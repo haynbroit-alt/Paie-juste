@@ -18,7 +18,7 @@ import {
 import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
 import { parseContrat } from "../js/contrat-parse.js";
-import { lettreAmiable, miseEnDemeure } from "../js/letters.js";
+import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
 import { parisLocalToIso } from "../js/util.js";
 import fs from "node:fs";
@@ -229,6 +229,19 @@ console.log("=== 9. Données EXEMPLE : écart attendu calculé à la main ===");
     annexe: {},
   });
   t(am.includes("régularisation") && !am.includes("mise en demeure"), "demande amiable sans menace");
+  const rg = demandeAccesRgpd({ profil: {}, mission: P.contrat, periodeLabel: "Octobre 2026", dateStr: "10/11/2026" });
+  t(rg.includes("article 15") && rg.includes("2016/679"), "RGPD : article 15 du règlement cité");
+  t(rg.includes("un mois") && rg.includes("deux mois") && rg.includes("gratuite"), "RGPD : délai et gratuité");
+  t(rg.includes("entreprise utilisatrice"), "RGPD intérim : relevés transmis par l'entreprise utilisatrice");
+  t(!/restant dû|vous mets en demeure|Total/.test(rg), "RGPD : aucun montant réclamé, aucune menace");
+  t(rg.includes("cnil.fr") && rg.includes("pas un conseil juridique"), "RGPD : recours CNIL et avertissement");
+  const rgCdi = demandeAccesRgpd({
+    profil: {},
+    mission: { type: "cdi", mode: "mensuel", mensuel: 2000, hebdo: 35 },
+    periodeLabel: "Octobre 2026",
+    dateStr: "10/11/2026",
+  });
+  t(!rgCdi.includes("entreprise utilisatrice") && rgCdi.includes("pointages"), "RGPD CDI : sans mention d'intérim");
 }
 
 console.log("=== 10. Tout est en ordre / trop-perçu ===");

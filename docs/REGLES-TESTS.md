@@ -28,6 +28,8 @@ Les montants viennent de `js/calc.js` et `js/compute.js`. Les tests historiques 
 | Réduction 11,31 % sur les heures sup seulement        | F2391                           | `run.mjs` §12 ; `rules.mjs` §18                     |
 | Heures complémentaires : pas de réduction             | INCONNU, non appliquée          | `rules.mjs` §18                                     |
 | Plafond 4 005 €, tranche 2, APEC, Alsace-Moselle      | F2302, URSSAF                   | `rules.mjs` §18                                     |
+| Brut → net comparé au moteur Urssaf                   | `modele-social` 11.1.0          | `urssaf.mjs` (non cadre, avec et sans heures sup)   |
+| Demande d'accès aux données                           | RGPD art. 12 et 15, CNIL        | `run.mjs` §9 ; navigateur, onglet Réclamer          |
 | Prélèvement à la source saisi                         | bulletin / impots.gouv          | `run.mjs` §7                                        |
 | Seuil d'écart 1 €                                     | choix d'affichage               | `run.mjs` §10 ; pile à 1,00 € `rules.mjs` §19       |
 | Arrondi au centime                                    | formule de `regles.md` §6       | `rules.mjs` §15 et propriété §20                    |
