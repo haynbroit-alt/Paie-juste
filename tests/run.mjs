@@ -19,6 +19,7 @@ import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
 import { parseContrat } from "../js/contrat-parse.js";
 import { parseBulletin } from "../js/bulletin-parse.js";
+import { chiffrer, dechiffrer, estSauvegardeChiffree, codeValide, META_KEYS, ITERATIONS } from "../js/sauvegarde.js";
 import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
 import { parisLocalToIso } from "../js/util.js";
@@ -496,6 +497,54 @@ console.log("=== 24. Lecture d'un bulletin de paie ===");
   t(c.base.extrait.includes("Salaire de base"), "chaque montant garde sa ligne d'origine");
   t(Object.keys(parseBulletin("").champs).length === 0, "texte vide : rien proposé");
   t(parseBulletin("Salaire de base 151.67 12.02 1823.07").champs.base?.value === 1823.07, "points décimaux acceptés");
+}
+
+console.log("=== 25. Sauvegarde chiffrée ===");
+{
+  const contenu = { export: { records: [{ seq: 0, type: "genesis" }] }, meta: { profil: { nom: "Jean Exemple" } } };
+  const s = await chiffrer(contenu, "mon-code-secret", { iterations: 1000 });
+  t(
+    estSauvegardeChiffree(s) && s.kdf.name === "PBKDF2" && s.chiffrement.name === "AES-GCM",
+    "format : PBKDF2 + AES-GCM",
+  );
+  t(!JSON.stringify(s).includes("Jean Exemple"), "le fichier ne contient rien de lisible");
+  const r = await dechiffrer(s, "mon-code-secret");
+  t(JSON.stringify(r) === JSON.stringify(contenu), "aller-retour : données identiques");
+  let erreur = "";
+  try {
+    await dechiffrer(s, "mauvais-code");
+  } catch (e) {
+    erreur = e.message;
+  }
+  t(erreur.includes("Code incorrect"), "mauvais code refusé");
+  const abime = {
+    ...s,
+    donnees: s.donnees.slice(0, -6) + (s.donnees.slice(-6, -5) === "A" ? "B" : "A") + s.donnees.slice(-5),
+  };
+  erreur = "";
+  try {
+    await dechiffrer(abime, "mon-code-secret");
+  } catch (e) {
+    erreur = e.message;
+  }
+  t(erreur !== "", "fichier modifié détecté");
+  const s2 = await chiffrer(contenu, "mon-code-secret", { iterations: 1000 });
+  t(s2.kdf.sel !== s.kdf.sel && s2.chiffrement.iv !== s.chiffrement.iv, "sel et vecteur tirés au hasard à chaque fois");
+  t(codeValide("court") !== "" && codeValide("assez-long") === "", "code de 8 caractères minimum");
+  let refuse = false;
+  try {
+    await chiffrer(contenu, "court");
+  } catch {
+    refuse = true;
+  }
+  t(refuse, "chiffrer avec un code trop court : refusé");
+  t(ITERATIONS >= 600000, "600 000 itérations par défaut");
+  t(
+    META_KEYS.includes("journee") && META_KEYS.includes("rappelHeure") && META_KEYS.includes("profil"),
+    "réglages sauvegardés et relus (dont horaires habituels)",
+  );
+  const app = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), "../js/app.js"), "utf8");
+  t(/for \(const k of META_KEYS\)/.test(app), "l'appli relit tous les réglages à l'ouverture");
 }
 
 runRules(t, eq);

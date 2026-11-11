@@ -1,5 +1,14 @@
 # Journal des changements
 
+## 0.5.0 — 2026-11-11
+
+Ne plus rien perdre si le téléphone casse. Les montants de paie ne changent pas.
+
+- Mes données : « 💾 Sauvegarde chiffrée ». Un fichier unique, chiffré sur le téléphone (AES-256-GCM, clé PBKDF2-SHA-256 à 600 000 itérations tirée d'un code de 8 caractères minimum). Il contient tout le journal scellé et les réglages. Sur Android, il s'envoie où l'on veut (Drive, e-mail…) ; sinon il est téléchargé.
+- Restauration : code demandé, chaîne d'empreintes vérifiée avant de remplacer quoi que ce soit. Un mauvais code ou un fichier modifié sont refusés.
+- Mes heures : un rappel s'affiche si la dernière sauvegarde date de plus de 30 jours.
+- Correction : les horaires habituels (« comme d'habitude ») et l'heure du rappel sont relus à l'ouverture de l'appli. Ils étaient perdus au redémarrage depuis la 0.4.0.
+
 ## 0.4.0 — 2026-11-10
 
 Plus rapide, plus clair. Les montants de paie ne changent pas.

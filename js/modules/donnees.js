@@ -2,6 +2,7 @@ import { buildExport, buildCsv, checkImport } from "../export.js";
 import { verifyChain } from "../chain.js";
 import { downloadBlob, esc } from "../util.js";
 import { APP_VERSION } from "../version.js";
+import { chiffrer, dechiffrer, estSauvegardeChiffree, codeValide, CODE_MIN, META_KEYS } from "../sauvegarde.js";
 
 const stamp = () => new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" }).replace(/[-: ]/g, "").slice(0, 12);
 
@@ -10,7 +11,19 @@ export default {
   label: "Données",
   render(ctx, el) {
     const v = ctx.verif || { ok: false, errors: [] };
+    const der = ctx.meta.derniereSauvegarde;
     el.innerHTML = `<h2>Mes données</h2>
+      <div class="card" id="sauvegarde"><h3>💾 Sauvegarde chiffrée</h3>
+        <p class="small muted">${der ? "Dernière : " + esc(new Date(der).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })) : "Aucune sauvegarde pour l'instant."} Si vous perdez ce téléphone, c'est elle qui garde vos heures.</p>
+        <label for="s-code">Code secret (${CODE_MIN} caractères minimum)</label><input id="s-code" type="password" autocomplete="new-password">
+        <label for="s-code2">Le même code, encore</label><input id="s-code2" type="password" autocomplete="new-password">
+        <p class="note bad">Notez ce code ailleurs. Sans lui, la sauvegarde est perdue : personne ne peut l'ouvrir.</p>
+        <button class="btn primary" id="s-make">Créer la sauvegarde</button>
+        <details><summary class="small" style="min-height:44px;display:flex;align-items:center">Restaurer une sauvegarde</summary>
+          <label class="btn" for="s-file" style="cursor:pointer">Choisir le fichier de sauvegarde</label><input id="s-file" type="file" accept=".json,application/json" hidden>
+          <label for="s-rcode">Code secret de cette sauvegarde</label><input id="s-rcode" type="password" autocomplete="current-password">
+          <button class="btn" id="s-restore">Restaurer</button><p id="s-res" class="small"></p></details>
+        <p id="s-out" class="small"></p></div>
       <div class="card"><div class="row"><div class="grow"><h3>Chaîne d'empreintes SHA-256</h3><p class="small muted">${ctx.records.length} enregistrements · empreinte finale <span class="num">${esc((ctx.records[ctx.records.length - 1]?.hash || "").slice(0, 16))}…</span></p></div><span class="tag ${v.ok ? "ok" : "bad"}">${v.ok ? "INTACTE" : "ROMPUE"}</span></div>
         <button class="btn" id="d-verify">Vérifier maintenant</button><pre id="d-res" class="small" style="white-space:pre-wrap"></pre>
         <p class="small dim">Chaque enregistrement contient l'empreinte du précédent. Ce n'est ni une blockchain ni une crypto-monnaie, et ce n'est pas une preuve certifiée : cela montre seulement qu'aucune ligne n'a été modifiée ou retirée sans que ça se voie.</p></div>
@@ -59,6 +72,77 @@ export default {
         ctx.refresh();
       } catch (err) {
         out.textContent = "Fichier illisible : " + err.message;
+      }
+    };
+    el.querySelector("#s-make").onclick = async (e) => {
+      const code = el.querySelector("#s-code").value;
+      const err =
+        codeValide(code) || (code !== el.querySelector("#s-code2").value ? "Les deux codes ne sont pas pareils." : "");
+      if (err) return ctx.toast(err, true);
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = "Chiffrement…";
+      try {
+        const meta = {};
+        for (const k of META_KEYS) if (k !== "derniereSauvegarde" && ctx.meta[k] != null) meta[k] = ctx.meta[k];
+        const s = await chiffrer({ export: buildExport(ctx.records, { exemple: ctx.demo }), meta }, code);
+        const file = new File(
+          [JSON.stringify(s)],
+          `paie-juste-sauvegarde${ctx.demo ? "-EXEMPLE" : ""}-${stamp()}.json`,
+          {
+            type: "application/json",
+          },
+        );
+        if (!ctx.demo) await ctx.setMeta("derniereSauvegarde", new Date().toISOString());
+        el.querySelector("#s-code").value = el.querySelector("#s-code2").value = "";
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: "Sauvegarde Paie Juste" });
+          } catch {
+            downloadBlob(file.name, file);
+          }
+        } else downloadBlob(file.name, file);
+        ctx.toast("Sauvegarde créée. Rangez-la hors du téléphone (Drive, e-mail…).");
+        ctx.go("donnees");
+      } catch (x) {
+        el.querySelector("#s-out").textContent = "Échec : " + x.message;
+        btn.disabled = false;
+        btn.textContent = "Créer la sauvegarde";
+      }
+    };
+    el.querySelector("#s-restore").onclick = async () => {
+      const out = el.querySelector("#s-res");
+      const f = el.querySelector("#s-file").files[0];
+      if (!f) return (out.textContent = "Choisissez d'abord le fichier.");
+      try {
+        const obj = JSON.parse(await f.text());
+        if (!estSauvegardeChiffree(obj)) {
+          out.textContent =
+            "Ce fichier n'est pas une sauvegarde chiffrée (pour un export JSON simple, utilisez « Importer » plus bas).";
+          return;
+        }
+        out.textContent = "Déchiffrement…";
+        const contenu = await dechiffrer(obj, el.querySelector("#s-rcode").value);
+        const r = await checkImport(contenu.export);
+        if (!r.ok) {
+          out.textContent = "Restauration refusée : " + r.errors.slice(0, 3).join(" · ");
+          return;
+        }
+        const n = contenu.export.records.length;
+        if (
+          !confirm(
+            `Sauvegarde vérifiée (${n} enregistrements). Remplacer les données ${ctx.demo ? "de l'exemple" : "de ce téléphone"} ?`,
+          )
+        ) {
+          out.textContent = "";
+          return;
+        }
+        await ctx.store.replaceAll(contenu.export.records);
+        for (const [k, v] of Object.entries(contenu.meta || {})) if (META_KEYS.includes(k)) await ctx.setMeta(k, v);
+        ctx.toast("Sauvegarde restaurée.");
+        ctx.refresh();
+      } catch (x) {
+        out.textContent = x.message;
       }
     };
     el.querySelector("#d-demo").onclick = () => ctx.setDemo(!ctx.demo);

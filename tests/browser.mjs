@@ -340,6 +340,83 @@ console.log("=== Photo du bulletin de paie (OCR local) ===");
   await p.close();
 }
 
+console.log("=== Sauvegarde chiffrée : créer, effacer, restaurer ===");
+{
+  const dl = fs.mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "pj-sauv-"));
+  const p = await newPage();
+  await p.goto(BASE + "?nosw", { waitUntil: "networkidle0" });
+  await click(p, "#go-c");
+  await p.select("#f-type", "cdi");
+  await wait(300);
+  await p.type("#f-taux", "12");
+  await p.type("#f-employeur", "Sauvegarde SARL");
+  await click(p, "#f-save");
+  await wait(500);
+  await p.evaluate(() => window.__pj.go("pointer"));
+  await wait(300);
+  await click(p, "#j-ok");
+  await wait(900);
+  const avant = await p.evaluate(async () => (await window.__pj.store.all()).length);
+  await p.evaluate(() => window.__pj.go("donnees"));
+  await wait(300);
+  await p.type("#s-code", "chantier-2026");
+  await p.type("#s-code2", "chantier-2026");
+  await p.evaluate(() => {
+    navigator.canShare = () => false;
+    const orig = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (b) => {
+      window.__dernierFichier = b;
+      return orig(b);
+    };
+  });
+  await click(p, "#s-make");
+  await wait(3000);
+  const recu = await p.evaluate(async () =>
+    window.__dernierFichier ? { nom: window.__dernierFichier.name, texte: await window.__dernierFichier.text() } : null,
+  );
+  const fichier = recu && recu.nom;
+  if (recu) fs.writeFileSync(path.join(dl, fichier), recu.texte);
+  t(!!fichier, "fichier de sauvegarde créé : " + fichier);
+  const contenu = fichier ? fs.readFileSync(path.join(dl, fichier), "utf8") : "";
+  t(
+    contenu.includes("sauvegarde-chiffree") && !contenu.includes("Sauvegarde SARL"),
+    "fichier chiffré : l'employeur n'y est pas lisible",
+  );
+  t((await txt(p, "#sauvegarde")).includes("Dernière"), "date de la dernière sauvegarde affichée");
+  // tout effacer, puis restaurer
+  await p.type("#d-wipe-t", "EFFACER");
+  await click(p, "#d-wipe");
+  await wait(800);
+  const vide = await p.evaluate(async () => (await window.__pj.store.all()).length);
+  t(vide < avant, "données effacées");
+  p.on("dialog", (d) => d.accept());
+  await p.evaluate(() => window.__pj.go("donnees"));
+  await wait(300);
+  await p.$eval("#sauvegarde details", (d) => (d.open = true));
+  const input = await p.$("#s-file");
+  await input.uploadFile(path.join(dl, fichier));
+  await p.type("#s-rcode", "mauvais-code");
+  await click(p, "#s-restore");
+  await wait(2500);
+  t((await txt(p, "#s-res")).includes("Code incorrect"), "mauvais code : refusé");
+  await p.$eval("#s-rcode", (e) => (e.value = ""));
+  await p.type("#s-rcode", "chantier-2026");
+  await click(p, "#s-restore");
+  await wait(3000);
+  const apres = await p.evaluate(async () => (await window.__pj.store.all()).length);
+  t(apres === avant, `restauration : ${apres} enregistrements sur ${avant}`);
+  t((await txt(p, "#seal-pill")).includes("✓"), "chaîne intacte après restauration");
+  await p.reload({ waitUntil: "networkidle0" });
+  await p.evaluate(() => window.__pj.go("pointer"));
+  await wait(400);
+  t(
+    !!(await p.$("#j-modif")) || !!(await p.$("#j-vite")),
+    "après réouverture : journée et horaires habituels retrouvés",
+  );
+  await p.close();
+  fs.rmSync(dl, { recursive: true, force: true });
+}
+
 console.log("=== Service worker et manifeste (sous-chemin) ===");
 {
   const p = await newPage();

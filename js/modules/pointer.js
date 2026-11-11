@@ -287,10 +287,14 @@ export default {
     const existant = journees.find((j) => j.date === jour);
     const lundi = ui.semaine || weekKey(today);
     const heureParis = Number(isoToParisLocal(nowIso()).slice(11, 13));
+    const der = ctx.meta.derniereSauvegarde;
+    const aSauvegarder =
+      !ctx.demo && journees.length >= 3 && (!der || Date.now() - new Date(der).getTime() > 30 * 864e5);
     const rienAujourdhui = !journees.some((j) => j.date === today && !j.supprimee);
     el.innerHTML = `
       ${contratSelect(ctx)}
       ${rienAujourdhui && heureParis >= 17 ? `<p class="note" id="j-oubli">Heures du jour pas encore notées.</p>` : ""}
+      ${aSauvegarder ? `<button class="note" id="go-sauv" style="width:100%;text-align:left;border:0;cursor:pointer">💾 Pensez à sauvegarder vos heures${der ? "" : " (jamais fait)"}.</button>` : ""}
       ${existant && !existant.supprimee && !existant.aVerifier && !ui.edit ? faitCard(today, jour, existant) : journeeCard(ctx, today, jour, existant)}
       ${semaineCard(c, punches, lundi, today)}
       <button class="btn" id="go-paie">📄 Mon salaire du mois</button>
@@ -312,6 +316,8 @@ export default {
     } else bindJournee(ctx, el, c, existant);
     bindRappel(ctx, el, today);
     el.querySelector("#go-paie").onclick = () => ctx.go("paie");
+    const gs = el.querySelector("#go-sauv");
+    if (gs) gs.onclick = () => ctx.go("donnees");
     const decale = (n) => {
       const [y, m, d] = lundi.split("-").map(Number);
       ui.semaine = new Date(Date.UTC(y, m - 1, d + 7 * n)).toISOString().slice(0, 10);
