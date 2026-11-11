@@ -17,7 +17,16 @@ import { parseBulletin } from "../bulletin-parse.js";
 
 const ui = { periode: null, avecFin: null };
 /** Lecture d'un bulletin (photo ou PDF) : état de l'écran, rien n'est enregistré ici. */
-const bimp = { progress: null, error: "", champs: null, periode: null, finContrat: null, fill: null, raw: "" };
+const bimp = {
+  progress: null,
+  error: "",
+  champs: null,
+  detail: [],
+  periode: null,
+  finContrat: null,
+  fill: null,
+  raw: "",
+};
 const NOMS_CHAMPS = {
   heures: "Heures payées",
   base: "Salaire de base",
@@ -35,7 +44,13 @@ const NOMS_CHAMPS = {
 };
 
 async function lireBulletin(ctx, file) {
-  Object.assign(bimp, { error: "", champs: null, periode: null, progress: { status: "Préparation", progress: 0 } });
+  Object.assign(bimp, {
+    error: "",
+    champs: null,
+    detail: [],
+    periode: null,
+    progress: { status: "Préparation", progress: 0 },
+  });
   ctx.go("paie");
   const prog = (m) => {
     bimp.progress = m;
@@ -63,6 +78,7 @@ function analyserBulletin(text) {
   bimp.raw = text;
   const r = parseBulletin(text);
   bimp.champs = r.champs;
+  bimp.detail = r.detail || [];
   bimp.periode = r.periode;
   bimp.finContrat = r.finContrat || null;
   bimp.interim = !!r.interim;
@@ -153,6 +169,7 @@ function verifCard(c, periodeCourante) {
   return `<div class="card" id="verif"><h2>Ma fiche de paie · ${esc(fmtMois(periode))}</h2>
     ${verdict}
     <ul class="verifs">${items.join("") || item(null, "Rien à contrôler sur ce bulletin.")}</ul>
+    ${toucheTable(valeursLues(), bimp.detail, v, "touche")}
     <details><summary class="small" style="min-height:44px;display:flex;align-items:center">Ce que j'ai lu</summary>
       <ul class="verifs">${Object.entries(F)
         .map(
@@ -164,6 +181,42 @@ function verifCard(c, periodeCourante) {
     <label class="btn" for="bi-file" style="cursor:pointer">📷 Reprendre la photo</label>${prise}
     ${etat}
     <p class="small muted">Estimation, à vérifier. Ce n'est pas un conseil juridique.</p></div>`;
+}
+
+/** Nombre à la française, sans zéros inutiles (128 · 7,5). @param {number} n */
+const fmtNb = (n) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
+/**
+ * « Ce que j'ai touché » : chaque ligne de gain lue, puis les indemnités de fin absentes, puis brut et net.
+ * @param {Record<string, any>} F montants lus (nombres)
+ * @param {Array<{libelle: string, champ: string, montant: number, quantite: number|null, taux: number|null}>|undefined} detail
+ * @param {ReturnType<typeof verifierBulletinSeul>} v vérification
+ * @param {string} id
+ */
+function toucheTable(F, detail, v, id) {
+  const lignes = (Array.isArray(detail) ? detail : []).map(
+    (d) =>
+      `<tr><td>${esc(d.libelle || NOMS_CHAMPS[d.champ] || d.champ)}${d.quantite != null && d.taux != null ? `<span class="art">${fmtNb(d.quantite)} × ${fmtEur(d.taux)}</span>` : ""}</td><td class="r num">${fmtEur(d.montant)}</td></tr>`,
+  );
+  const absentes = v.lignes
+    .filter((l) => l.recu == null && (l.alerte || l.ok === false))
+    .map(
+      (l) =>
+        `<tr><td>⚠️ ${esc(l.label)}<span class="art">pas sur la fiche</span></td><td class="r num">≈ ${fmtEur(l.attendu)}</td></tr>`,
+    );
+  const tot = (k, label, cls = "") =>
+    typeof F[k] === "number"
+      ? `<tr${cls ? ` class="${cls}"` : ""}><td>${label}</td><td class="r num">${fmtEur(F[k])}</td></tr>`
+      : "";
+  if (!lignes.length) return "";
+  return `<h3>Ce que j'ai touché</h3>
+    <table class="calc" id="${id}">
+      ${typeof F.heures === "number" ? `<tr><td>Heures payées</td><td class="r num">${fmtNb(F.heures)} h</td></tr>` : ""}
+      ${lignes.join("")}${absentes.join("")}
+      ${tot("brut", "Salaire brut", "tot")}
+      ${tot("netAvantImpot", "Net avant impôt")}
+      ${tot("net", "Net payé", "tot")}
+    </table>`;
 }
 
 function bindVerif(ctx, el, c, periodeCourante) {
@@ -203,8 +256,10 @@ function bindVerif(ctx, el, c, periodeCourante) {
       }
       const data = { contratId, periode, source: "photo", ...(bimp.finContrat ? { finContrat: bimp.finContrat } : {}) };
       for (const k of CHAMPS_BULLETIN) if (typeof v[k] === "number") data[k] = v[k];
+      if (typeof v.netAvantImpot === "number") data.netAvantImpot = v.netAvantImpot;
+      if (bimp.detail && bimp.detail.length) data.detail = bimp.detail;
       await ctx.append("bulletin", data);
-      Object.assign(bimp, { champs: null, raw: "", periode: null, finContrat: null });
+      Object.assign(bimp, { champs: null, detail: [], raw: "", periode: null, finContrat: null });
       ui.periode = periode;
       ctx.toast(c ? "Bulletin gardé." : "Bulletin gardé. Contrat créé : complétez-le dans « Contrat ».");
       await ctx.refresh();
@@ -382,6 +437,7 @@ function resumeCard(ctx, P, periode, isCur) {
         ? ""
         : `<p class="note bad" id="alerte-taux">Les taux de cette version (SMIC, cotisations) ont été vérifiés jusqu'au ${TAUX_VERIFIES_JUSQU_AU.split("-").reverse().join("/")}. Mettez l'appli à jour : les montants peuvent être faux.</p>`
     }
+    ${P.bulletin && Array.isArray(P.bulletin.detail) && P.bulletin.detail.length ? `<details open><summary class="small" style="min-height:44px;display:flex;align-items:center">Détail de ma fiche de paie</summary>${toucheTable(P.bulletin, P.bulletin.detail, verifierBulletinSeul(P.bulletin, { type: P.contrat.type, periode: P.bulletin.periode, finContrat: P.bulletin.finContrat || null, rules: P.contrat.rules }), "touche-garde")}</details>` : ""}
     ${duBulletin ? `<p class="small muted">Notez vos journées dans « Mes heures » pour vérifier aussi que toutes vos heures sont payées.</p>` : ""}
     <p class="small muted">Estimation, à vérifier.</p></div>`;
 }

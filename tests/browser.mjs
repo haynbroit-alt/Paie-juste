@@ -372,6 +372,11 @@ console.log("=== Fiche de paie en PDF de logiciel de paie (cases dans le désord
     res.includes("234,68 € reçus") && !res.includes("Photo mal lue"),
     "PDF colonne par colonne : congés payés lus, lecture fiable",
   );
+  const touche = await txt(p, "#touche");
+  t(
+    /Ce que j'ai touché/.test(res) && touche.includes("Salaire brut"),
+    "« Ce que j'ai touché » : détail ligne par ligne",
+  );
   if (!res.includes("213,35")) console.log(res.slice(0, 1200));
   await p.close();
 }

@@ -1,5 +1,13 @@
 # Journal des changements
 
+## 0.7.3 — 2026-11-11
+
+Le détail de la fiche de paie, ligne par ligne. Les montants de paie ne changent pas.
+
+- Après la vérification, un tableau « Ce que j'ai touché » : heures payées, heures normales et sup, congés pris, panier, trajet, transport, intempéries, chacun avec quantité × taux et montant, puis brut, net avant impôt et net payé.
+- Une indemnité absente (fin de mission, congés payés) y apparaît en ⚠️ avec le montant estimé.
+- Le détail est gardé avec le bulletin et reste visible dans « En bref ».
+
 ## 0.7.2 — 2026-11-11
 
 Fiche de paie d'agence d'intérim : lecture juste, et plus de faux écarts. Les montants de paie ne changent pas ; la vérification signale en plus une indemnité de fin de mission absente.
