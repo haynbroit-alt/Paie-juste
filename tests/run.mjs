@@ -18,6 +18,7 @@ import {
   controleSmic,
   tauxAJour,
   TAUX_VERIFIES_JUSQU_AU,
+  verifierBulletinSeul,
 } from "../js/calc.js";
 import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
@@ -590,6 +591,41 @@ console.log("=== 26. SMIC et date de validité des taux ===");
     tauxAJour(auj),
     `taux vérifiés jusqu'au ${TAUX_VERIFIES_JUSQU_AU} (aujourd'hui ${auj}) : sinon, mettre à jour SMIC et cotisations`,
   );
+}
+
+console.log("=== 27. Vérifier un bulletin à lui seul (sans saisie) ===");
+{
+  // Salaires soumis = 1 823,07 + 332,50 + 50,00 = 2 205,57 €.
+  // IFM = 10 % = 220,557 → 220,56 €. ICCP = 10 % de (2 205,57 + 220,56) = 242,613 → 242,61 €.
+  const b = { heures: 151.67, base: 1823.07, hs: 332.5, primes: 50, fin: 220.56, iccp: 242.61, brut: 2668.74 };
+  const v = verifierBulletinSeul(b, { type: "interim", periode: "2026-10" });
+  const L = Object.fromEntries(v.lignes.map((l) => [l.key, l]));
+  t(L.fin.attendu === 220.56 && L.fin.ok, "IFM 10 % : 220,56 € attendus, conforme");
+  t(L.iccp.attendu === 242.61 && L.iccp.ok, "ICCP 10 % IFM comprise : 242,61 € attendus, conforme");
+  t(v.fiable && v.manque === 0, "brut = somme des lignes : lecture fiable, rien ne manque");
+  // Taux = 1 823,07 / 151,67 = 12,02 €/h, SMIC d'octobre 12,31 € : (12,31 − 12,02) × 151,67 = 43,98 €.
+  t(
+    v.smic.sous && v.smic.taux === 12.02 && v.smic.manque === 43.98,
+    "taux de 12,02 € en octobre : sous le SMIC, 43,98 € sur le mois",
+  );
+  const bas = verifierBulletinSeul({ ...b, fin: 150, brut: 2598.18 }, { type: "interim", periode: "2026-10" });
+  t(bas.fiable && bas.manque === 70.56, "IFM versée 150 € au lieu de 220,56 € : il manque 70,56 €");
+  const douteux = verifierBulletinSeul({ ...b, fin: 150, brut: 3000 }, { type: "interim", periode: "2026-10" });
+  t(!douteux.fiable && douteux.manque === 0, "brut lu incohérent : lecture incomplète, aucun montant annoncé");
+  const sansIfm = verifierBulletinSeul({ heures: 151.67, base: 1867.02 }, { type: "interim", periode: "2026-10" });
+  t(
+    sansIfm.lignes.every((l) => l.ok === null && l.note) && sansIfm.manque === 0,
+    "pas d'IFM ni d'ICCP sur le bulletin : rien réclamé, explication",
+  );
+  t(!sansIfm.smic.sous, "1 867,02 € pour 151,67 h : au SMIC");
+  // CDD : congés payés hors précarité par défaut → 10 % de 2 205,57 = 220,56 €.
+  const cdd = verifierBulletinSeul({ ...b, iccp: 220.56, brut: 2646.69 }, { type: "cdd", periode: "2026-10" });
+  t(Object.fromEntries(cdd.lignes.map((l) => [l.key, l])).iccp.attendu === 220.56, "CDD : congés payés hors précarité");
+  t(
+    verifierBulletinSeul(b, { type: "cdi", periode: "2026-10" }).lignes.length === 0,
+    "CDI : pas d'indemnité de fin à contrôler",
+  );
+  t(verifierBulletinSeul({}, { type: "interim" }).lignes.length === 0, "bulletin vide : rien à contrôler");
 }
 
 runRules(t, eq);

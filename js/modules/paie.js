@@ -8,6 +8,7 @@ import {
   SMIC,
   tauxAJour,
   TAUX_VERIFIES_JUSQU_AU,
+  verifierBulletinSeul,
 } from "../calc.js";
 import { computePeriod, contratRows, periodsOf, previsionMois, prescriptionInfo } from "../compute.js";
 import { esc, fmtMois, fmtJour, nowIso } from "../util.js";
@@ -60,6 +61,128 @@ function analyserBulletin(text) {
   const r = parseBulletin(text);
   bimp.champs = r.champs;
   bimp.periode = r.periode;
+}
+
+const CHAMPS_BULLETIN = ["heures", "base", "hc", "hs", "primes", "fin", "iccp", "frais"];
+function valeursLues() {
+  /** @type {Record<string, number>} */
+  const v = {};
+  for (const [k, f] of Object.entries(bimp.champs || {})) v[k] = f.value;
+  return v;
+}
+/** Type de contrat : celui du contrat, sinon deviné sur le bulletin (une IFM = intérim). */
+function typeDevine(c) {
+  if (c) return c.type;
+  const f = bimp.champs && bimp.champs.fin;
+  if (!f) return "cdi";
+  return /mission|ifm/i.test(f.extrait) ? "interim" : "cdd";
+}
+const fmtHeures = (h) => String(h).replace(".", ",") + " h";
+
+function verifCard(c, periodeCourante) {
+  const F = bimp.champs;
+  const prise = `<input id="bi-file" type="file" accept="application/pdf,image/*" hidden>`;
+  const etat = `${bimp.progress ? `<p id="bi-st" class="small">${esc(bimp.progress.status || "Lecture…")}</p><div class="progress"><i id="bi-bar"></i></div>` : ""}
+    ${bimp.error ? `<p class="note bad">${esc(bimp.error)}</p>` : ""}`;
+  const coller = `<details><summary class="small" style="min-height:44px;display:flex;align-items:center">ou coller le texte du bulletin</summary>
+      <textarea id="bi-text" placeholder="Collez ici le texte du bulletin">${esc(bimp.raw)}</textarea><button class="btn" id="bi-parse">Vérifier ce texte</button></details>`;
+  if (!F || !Object.keys(F).length) {
+    return `<div class="card" id="verif"><h2>Ma fiche de paie</h2>
+      <label class="btn primary big" for="bi-file" style="cursor:pointer">📷 Vérifier ma fiche de paie</label>${prise}
+      ${F ? `<p class="note bad">Je n'ai rien pu lire. Reprenez la photo bien à plat, bien éclairée.</p>` : ""}
+      ${etat}${coller}</div>`;
+  }
+  const periode = bimp.periode || periodeCourante;
+  const v = verifierBulletinSeul(valeursLues(), { type: typeDevine(c), periode, rules: c ? c.rules : undefined });
+  const verdict = !v.fiable
+    ? `<p class="verdict bad">⚠️ Photo mal lue : des montants manquent. Reprenez la photo.</p>`
+    : v.manque > 0
+      ? `<p class="verdict bad">❌ Il manque environ ${fmtEur(v.manque)}</p>`
+      : v.smic && v.smic.sous
+        ? `<p class="verdict bad">❌ Votre taux horaire est sous le SMIC</p>`
+        : `<p class="verdict ok">✅ Tout est bon sur ce bulletin</p>`;
+  const item = (ok, txt) =>
+    `<li><span class="ic">${ok === true ? "✅" : ok === false ? "❌" : "➖"}</span><span>${txt}</span></li>`;
+  const items = [
+    ...(v.smic
+      ? [
+          item(
+            !v.smic.sous,
+            v.smic.sous
+              ? `Taux horaire ${fmtEur(v.smic.taux)} : sous le SMIC (${fmtEur(v.smic.smic)}), soit ${fmtEur(v.smic.manque)} de moins sur le mois. Sauf apprenti ou moins de 18 ans.`
+              : `Taux horaire ${fmtEur(v.smic.taux)} : au moins le SMIC (${fmtEur(v.smic.smic)}).`,
+          ),
+        ]
+      : []),
+    ...v.lignes.map((l) =>
+      item(
+        l.ok,
+        l.recu == null
+          ? `${esc(l.label)} : ${esc(l.note)}`
+          : `${esc(l.label)} : ${fmtEur(l.recu)} reçus, ${fmtEur(l.attendu)} attendus${l.ok ? "" : ` — il manque ${fmtEur(l.ecart)}`}.`,
+      ),
+    ),
+  ];
+  return `<div class="card" id="verif"><h2>Ma fiche de paie · ${esc(fmtMois(periode))}</h2>
+    ${verdict}
+    <ul class="verifs">${items.join("") || item(null, "Rien à contrôler sur ce bulletin.")}</ul>
+    <details><summary class="small" style="min-height:44px;display:flex;align-items:center">Ce que j'ai lu</summary>
+      <ul class="verifs">${Object.entries(F)
+        .map(
+          ([k, f]) =>
+            `<li><span>${esc(NOMS_CHAMPS[k] || k)} : <b>${k === "heures" ? fmtHeures(f.value) : fmtEur(f.value)}</b><div class="ex">« ${esc(f.extrait)} »</div></span></li>`,
+        )
+        .join("")}</ul></details>
+    <button class="btn primary big" id="bi-garder">✅ Garder ce bulletin</button>
+    <label class="btn" for="bi-file" style="cursor:pointer">📷 Reprendre la photo</label>${prise}
+    ${etat}
+    <p class="small muted">Estimation, à vérifier. Ce n'est pas un conseil juridique.</p></div>`;
+}
+
+function bindVerif(ctx, el, c, periodeCourante) {
+  const f = el.querySelector("#bi-file");
+  if (f) {
+    f.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) lireBulletin(ctx, file);
+    };
+  }
+  const p = el.querySelector("#bi-parse");
+  if (p) {
+    p.onclick = () => {
+      analyserBulletin(el.querySelector("#bi-text").value);
+      ctx.go("paie");
+    };
+  }
+  const g = el.querySelector("#bi-garder");
+  if (g) {
+    g.onclick = async () => {
+      g.disabled = true;
+      const v = valeursLues();
+      const periode = bimp.periode || periodeCourante;
+      let contratId = c && c.id;
+      if (!contratId) {
+        const taux = v.heures > 0 && v.base > 0 ? Math.round((v.base / v.heures) * 10000) / 10000 : "";
+        const r = await ctx.append("contrat", {
+          type: typeDevine(null),
+          mode: "horaire",
+          taux,
+          hebdo: 35,
+          employeur: "",
+          depuisBulletin: true,
+        });
+        await ctx.setMeta("currentContrat", r.id);
+        contratId = r.id;
+      }
+      const data = { contratId, periode, source: "photo" };
+      for (const k of CHAMPS_BULLETIN) if (typeof v[k] === "number") data[k] = v[k];
+      await ctx.append("bulletin", data);
+      Object.assign(bimp, { champs: null, raw: "", periode: null });
+      ui.periode = periode;
+      ctx.toast(c ? "Bulletin gardé." : "Bulletin gardé. Contrat créé : complétez-le dans « Contrat ».");
+      await ctx.refresh();
+    };
+  }
 }
 export function selectedPeriod(ctx) {
   const c = ctx.state.contrats.get(ctx.meta.currentContrat);
@@ -184,7 +307,7 @@ function resumeCard(ctx, P, periode, isCur) {
       ? `<b style="color:var(--red)">il manque ${fmtEur(P.cmp.total)}</b>`
       : v === "ordre" || v === "trop_percu"
         ? `<b style="color:var(--green)">conforme ✓</b>`
-        : `<a href="#bulletin">à saisir ↓</a>`;
+        : `<a href="#verif">📷 à vérifier ↑</a>`;
   return `<div class="card resume" id="resume"><h2>En bref</h2>
     <table class="resume">
       <tr><td>Heures travaillées</td><td class="r num">${fmtH(m.total)}</td></tr>
@@ -215,7 +338,7 @@ function primesCard(P) {
     <button class="btn" id="p-add">＋ Ajouter (scellé)</button></details>`;
 }
 
-function bulletinCard(P, periode) {
+function bulletinCard(P) {
   const b = P.bulletin || {};
   const fields = [
     ["heures", "Heures payées"],
@@ -231,34 +354,11 @@ function bulletinCard(P, periode) {
       : []),
     ["frais", "Indemnités de frais (€)"],
   ];
-  const F = bimp.champs;
   const fill = bimp.fill || {};
-  const lecture = `<label class="btn primary" for="bi-file" style="cursor:pointer">📷 Photo ou PDF de ma fiche de paie</label>
-    <input id="bi-file" type="file" accept="application/pdf,image/*" hidden>
-    ${bimp.progress ? `<p id="bi-st" class="small">${esc(bimp.progress.status || "")}</p><div class="progress"><i id="bi-bar"></i></div>` : ""}
-    ${bimp.error ? `<p class="note bad">${esc(bimp.error)}</p>` : ""}
-    ${
-      F
-        ? Object.keys(F).length
-          ? `<h3 style="margin-top:1rem">Trouvé sur le bulletin — cochez ce qui est juste</h3>
-      ${bimp.periode && bimp.periode !== periode ? `<p class="note">Ce bulletin semble concerner ${esc(fmtMois(bimp.periode))}.</p>` : ""}
-      ${Object.entries(F)
-        .map(
-          ([k, f]) =>
-            `<div class="field-proposal"><input type="checkbox" data-bk="${k}" ${k === "brut" || k === "net" ? "disabled" : "checked"} aria-label="${NOMS_CHAMPS[k] || k}"><div><b>${NOMS_CHAMPS[k] || k} :</b> ${k === "heures" ? String(f.value).replace(".", ",") + " h" : fmtEur(f.value)}<div class="ex">« ${esc(f.extrait)} »</div></div></div>`,
-        )
-        .join("")}
-      <button class="btn" id="bi-apply">Remplir avec la sélection</button>`
-          : `<p class="note">Aucun montant reconnu. Recopiez-les ci-dessous.</p>`
-        : ""
-    }
-    <details><summary class="small" style="min-height:44px;display:flex;align-items:center">ou coller le texte du bulletin</summary>
-      <textarea id="bi-text" placeholder="Collez ici le texte du bulletin">${esc(bimp.raw)}</textarea><button class="btn" id="bi-parse">Analyser ce texte</button></details>`;
-  return `<div class="card" id="bulletin"><h3>Mon bulletin reçu</h3>
-    ${lecture}
+  return `<details class="card" id="bulletin"><summary><h3>Mon bulletin, à la main</h3></summary>
     <p class="small muted">Montants bruts. Laissez vide ce qui n'apparaît pas.</p>
     <div class="grid2">${fields.map(([k, l]) => `<div><label for="b-${k}">${l}</label><input id="b-${k}" type="number" inputmode="decimal" step="0.01" value="${fill[k] ?? b[k] ?? (k === "fin" ? (b.ifm ?? "") : "")}"></div>`).join("")}</div>
-    <button class="btn primary" id="b-save">Enregistrer le bulletin (scellé)</button></div>`;
+    <button class="btn" id="b-save">Enregistrer le bulletin (scellé)</button></details>`;
 }
 
 function compareCard(P) {
@@ -282,8 +382,10 @@ export default {
   render(ctx, el) {
     const R = currentCompute(ctx);
     if (!R) {
-      el.innerHTML = `<div class="card"><h2>Ma paie</h2><p>Ajoutez d'abord votre contrat.</p><button class="btn primary" id="go">Mon contrat</button></div>`;
+      el.innerHTML = `${verifCard(null, parisDate(nowIso()).slice(0, 7))}
+        <button class="btn" id="go">Ajouter mon contrat à la main</button>`;
       el.querySelector("#go").onclick = () => ctx.go("contrat");
+      bindVerif(ctx, el, null, parisDate(nowIso()).slice(0, 7));
       return;
     }
     const { P, months, periode, cur } = R;
@@ -292,6 +394,7 @@ export default {
     const opts = [...new Set([...months, cur])].sort().reverse();
     el.innerHTML = `${contratSelect(ctx)}
       <div class="row" style="margin-bottom:.8rem"><select id="per" class="grow">${opts.map((m) => `<option value="${m}" ${m === periode ? "selected" : ""}>${fmtMois(m)}</option>`).join("")}<option value="contrat" ${periode === "contrat" ? "selected" : ""}>Toute la durée du contrat</option></select></div>
+      ${verifCard(c, periode === "contrat" ? cur : periode)}
       ${resumeCard(ctx, P, periode, periode === cur)}
       ${P.cmp.verdict === "doit" ? hero(P) : ""}
       ${forecast(ctx, P, periode === cur)}
@@ -319,7 +422,7 @@ export default {
             : ""
         }
         ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</details>
-      ${bulletinCard(P, periode)}
+      ${bulletinCard(P)}
       ${compareCard(P)}
       ${primesCard(P)}
       ${P.cmp.verdict === "doit" ? `<button class="btn primary" id="go-rec">Préparer ma réclamation →</button>` : ""}`;
@@ -351,29 +454,7 @@ export default {
       ctx.toast("Réglages enregistrés sur ce téléphone.");
       ctx.go("paie");
     };
-    el.querySelector("#bi-file").onchange = (e) => {
-      const f = e.target.files && e.target.files[0];
-      if (f) lireBulletin(ctx, f);
-    };
-    el.querySelector("#bi-parse").onclick = () => {
-      analyserBulletin(el.querySelector("#bi-text").value);
-      ctx.go("paie");
-    };
-    const ap = el.querySelector("#bi-apply");
-    if (ap) {
-      ap.onclick = () => {
-        const fill = {};
-        el.querySelectorAll("[data-bk]").forEach((cb) => {
-          if (cb.checked && !cb.disabled) fill[cb.dataset.bk] = bimp.champs[cb.dataset.bk].value;
-        });
-        bimp.fill = fill;
-        if (bimp.periode && /^\d{4}-\d{2}$/.test(bimp.periode)) ui.periode = bimp.periode;
-        bimp.champs = null;
-        ctx.toast("Formulaire rempli : vérifiez puis enregistrez.");
-        ctx.go("paie");
-        document.querySelector("#bulletin")?.scrollIntoView({ block: "start" });
-      };
-    }
+    bindVerif(ctx, el, c, periode === "contrat" ? cur : periode);
     el.querySelector("#b-save").onclick = async () => {
       const data = { contratId: c.id, periode };
       el.querySelectorAll('[id^="b-"]').forEach((i) => {

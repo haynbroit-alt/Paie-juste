@@ -1198,3 +1198,33 @@ table.resume tr.tot td {
 table.resume td:first-child {
   width: 58%;
 }
+.verdict {
+  font-size: 1.35rem;
+  font-weight: 950;
+  margin: 0.4rem 0 0.8rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+}
+.verdict.ok {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.verdict.bad {
+  background: var(--red-bg);
+  color: var(--red);
+}
+ul.verifs {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0.8rem;
+}
+ul.verifs li {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 1.02rem;
+}
+ul.verifs .ic {
+  flex: none;
+}

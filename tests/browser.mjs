@@ -324,20 +324,63 @@ console.log("=== Photo du bulletin de paie (OCR local) ===");
   await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
   await wait(600);
   const input = await p.$("#bi-file");
-  t(!!input, "Ma paie : bouton « Photo ou PDF de ma fiche de paie »");
+  t(
+    !!input && (await txt(p, "#verif")).includes("Vérifier ma fiche de paie"),
+    "Ma paie : gros bouton « Vérifier ma fiche de paie »",
+  );
   const t0 = Date.now();
   await input.uploadFile(FIX + "/bulletin-photo.png");
-  await p.waitForSelector("#bi-apply", { timeout: 120000 }).catch(() => {});
-  const body = await txt(p, "#bulletin");
-  const ok = body.includes("1 823,07") && body.includes("220,56");
-  t(ok, `photo du bulletin (OCR, ${Math.round((Date.now() - t0) / 1000)} s) : salaire de base et IFM lus`);
-  if (!ok) console.log(body.slice(0, 1200));
-  await p.evaluate(() => document.querySelector("#bulletin").scrollIntoView({ block: "start" }));
+  await p.waitForSelector("#bi-garder", { timeout: 120000 }).catch(() => {});
+  const res = await txt(p, "#verif");
+  t(
+    /Octobre 2026/i.test(res),
+    `photo lue (OCR, ${Math.round((Date.now() - t0) / 1000)} s) : mois d'octobre 2026 reconnu`,
+  );
+  t(res.includes("220,56") && res.includes("attendus"), "vérification automatique : IFM reçue et attendue affichées");
+  t(res.includes("sous le SMIC"), "vérification automatique : taux de 12,02 € signalé sous le SMIC d'octobre");
+  if (!res.includes("220,56")) console.log(res.slice(0, 1200));
+  t(!(await p.$("[data-bk]")), "aucune case à cocher");
+  await p.evaluate(() => document.querySelector("#verif").scrollIntoView({ block: "start" }));
   await wait(900);
   await p.screenshot({ path: `${OUT}/2d-ma-paie-photo-bulletin.png` });
-  await click(p, "#bi-apply");
-  await wait(600);
-  t((await p.$eval("#b-base", (e) => e.value)) === "1823.07", "formulaire du bulletin pré-rempli, à valider");
+  const avant = await p.evaluate(
+    async () => (await window.__pj.store.all()).filter((r) => r.type === "bulletin").length,
+  );
+  await click(p, "#bi-garder");
+  await wait(1200);
+  const bulls = await p.evaluate(async () => (await window.__pj.store.all()).filter((r) => r.type === "bulletin"));
+  t(
+    bulls.length === avant + 1 && bulls[bulls.length - 1].data.base === 1823.07,
+    "un geste : bulletin gardé et scellé (base 1 823,07 €)",
+  );
+  await p.close();
+}
+
+console.log("=== Fiche de paie sans contrat : tout automatique ===");
+{
+  const p = await newPage();
+  await p.goto(BASE + "?nosw&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(500);
+  const input = await p.$("#bi-file");
+  t(!!input, "sans contrat : Ma paie propose quand même la photo");
+  await input.uploadFile(FIX + "/bulletin-photo.png");
+  await p.waitForSelector("#bi-garder", { timeout: 120000 }).catch(() => {});
+  t((await txt(p, "#verif")).includes("Indemnité de fin de mission"), "sans contrat : intérim deviné grâce à l'IFM");
+  await click(p, "#bi-garder");
+  await wait(1500);
+  const recs = await p.evaluate(async () =>
+    (await window.__pj.store.all()).map((r) => ({ type: r.type, data: r.data })),
+  );
+  const ct = recs.find((r) => r.type === "contrat");
+  t(
+    !!ct && ct.data.type === "interim" && Math.abs(ct.data.taux - 12.02) < 0.01,
+    "contrat créé tout seul : intérim, 12,02 €/h",
+  );
+  t(
+    recs.some((r) => r.type === "bulletin"),
+    "bulletin gardé",
+  );
+  t(!!(await p.$("#resume")), "Ma paie s'affiche ensuite normalement");
   await p.close();
 }
 

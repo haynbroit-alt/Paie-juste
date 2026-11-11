@@ -1,4 +1,4 @@
 export const APP_ID = "pointeuse-paie-interim";
 export const APP_NAME = "Pointeuse & Paie";
-export const APP_VERSION = "0.6.0";
+export const APP_VERSION = "0.7.0";
 export const DISCLAIMER = "Estimation, à vérifier. Ce n'est pas un conseil juridique.";
