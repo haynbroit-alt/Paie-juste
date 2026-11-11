@@ -1,5 +1,15 @@
 # Journal des changements
 
+## 0.7.0 — 2026-11-11
+
+La fiche de paie se vérifie toute seule. Les montants de paie ne changent pas.
+
+- Ma paie : un gros bouton « 📷 Vérifier ma fiche de paie ». Photo → lecture sur le téléphone → verdict immédiat (« ✅ Tout est bon » ou « ❌ Il manque environ X € »), avec une ligne ✅ / ❌ par contrôle. Plus de cases à cocher.
+- Contrôles faits avec les seuls chiffres du bulletin : taux horaire face au SMIC du mois, indemnité de fin de mission ou de contrat à 10 %, congés payés à 10 % (IFM comprise en intérim).
+- Si le brut lu ne correspond pas à la somme des lignes lues, l'appli dit « Photo mal lue » et n'annonce aucun montant dû.
+- « ✅ Garder ce bulletin » l'enregistre (scellé) en un geste. Sans contrat, l'appli en crée un à partir du bulletin (type deviné grâce à l'IFM, taux = base / heures), à compléter ensuite.
+- La saisie à la main reste possible, repliée sous « Mon bulletin, à la main ».
+
 ## 0.6.0 — 2026-11-11
 
 Deux contrôles de sécurité. Les montants de paie ne changent pas.

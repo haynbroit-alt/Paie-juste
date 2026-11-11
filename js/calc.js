@@ -821,3 +821,78 @@ export function fmtEur(x) {
     .format(x)
     .replace(/[\u202f\u00a0]/g, " ");
 }
+
+/**
+ * Vérifie un bulletin À LUI SEUL, sans pointages ni saisie : ce qu'on peut contrôler avec ses propres chiffres.
+ * - taux horaire (base / heures) au moins égal au SMIC du mois (alerte, voir controleSmic) ;
+ * - indemnité de fin (IFM / précarité) = 10 % des salaires soumis du bulletin (L1251-32, L1243-8) ;
+ * - congés payés (ICCP) = 10 % des salaires, IFM comprise en intérim (L1251-19, L1242-16).
+ * Si le brut lu ne correspond pas à la somme des lignes lues, la lecture est jugée incomplète :
+ * aucun montant n'est alors annoncé comme dû.
+ * @param {Record<string, number|undefined>} b montants lus (heures, base, hs, hc, primes, fin, iccp, brut)
+ * @param {{ type?: string, periode?: string, rules?: Partial<typeof DEFAULT_RULES> }} [opts]
+ */
+export function verifierBulletinSeul(b, opts = {}) {
+  const r = { ...DEFAULT_RULES, ...(opts.rules || {}) };
+  /** @param {unknown} v */
+  const c = (v) => (typeof v === "number" && Number.isFinite(v) ? cents(v) : 0);
+  const salairesC = c(b.base) + c(b.hs) + c(b.hc) + c(b.primes);
+  /** @type {Array<{ key: string, label: string, attendu: number, recu: number|null, ecart: number, ok: boolean|null, regle: string, note: string }>} */
+  const lignes = [];
+  const interim = opts.type === "interim";
+  const finType = opts.type === "interim" || opts.type === "cdd";
+  const T = finType ? TYPES[/** @type {"interim"|"cdd"} */ (opts.type)] : null;
+  const seuil = cents(r.seuilEcartEuros);
+  /** @param {string} key @param {string} label @param {number} attC @param {unknown} recu @param {string} regle @param {string} absent */
+  const ligne = (key, label, attC, recu, regle, absent) => {
+    const recuC = typeof recu === "number" && Number.isFinite(recu) ? cents(recu) : null;
+    const ecartC = recuC == null ? 0 : attC - recuC;
+    lignes.push({
+      key,
+      label,
+      attendu: attC / 100,
+      recu: recuC == null ? null : recuC / 100,
+      ecart: ecartC / 100,
+      ok: recuC == null ? null : ecartC <= seuil,
+      regle,
+      note: recuC == null ? absent : "",
+    });
+    return ecartC;
+  };
+  let manqueC = 0;
+  if (T && salairesC > 0) {
+    const finAttC = cents((salairesC * r.finTaux) / 100);
+    const e = ligne(
+      "fin",
+      interim ? "Indemnité de fin de mission (10 %)" : "Indemnité de fin de contrat (10 %)",
+      finAttC,
+      b.fin,
+      T.finArt,
+      "Pas sur ce bulletin : normal si le contrat continue.",
+    );
+    if (e > seuil) manqueC += e;
+    const baseIccpC = salairesC + (interim && typeof b.fin === "number" ? finAttC : 0);
+    const e2 = ligne(
+      "iccp",
+      "Congés payés (10 %)",
+      cents((baseIccpC * r.iccpTaux) / 100),
+      b.iccp,
+      T.iccpArt,
+      "Pas sur ce bulletin : normal si le contrat continue ou si vous avez pris vos congés.",
+    );
+    if (e2 > seuil) manqueC += e2;
+  }
+  // Fiabilité de la lecture : le brut lu doit retomber sur la somme des lignes lues.
+  const sommeC = salairesC + c(b.fin) + c(b.iccp);
+  const fiable = typeof b.brut !== "number" || Math.abs(c(b.brut) - sommeC) <= seuil;
+  let smic = null;
+  if (typeof b.heures === "number" && b.heures > 0 && typeof b.base === "number" && b.base > 0 && opts.periode) {
+    const s = smicHoraire(opts.periode + "-01");
+    const taux = Math.round((b.base / b.heures) * 10000) / 10000;
+    if (s != null) {
+      const sous = taux < s - 0.004;
+      smic = { smic: s, taux, sous, manque: sous ? round2((s - taux) * b.heures) : 0 };
+    }
+  }
+  return { lignes, manque: fiable ? manqueC / 100 : 0, fiable, smic, salaires: salairesC / 100 };
+}

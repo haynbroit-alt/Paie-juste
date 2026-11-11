@@ -72,6 +72,16 @@ Source : [service-public F2302 « Cotisations salariales »](https://www.service
 - **Pas de montant ajouté au total réclamé** : **INCONNU** pour les moins de 18 ans (abattements) et les apprentis, qui peuvent être payés sous le SMIC. Mayotte (9,56 € depuis le 1er juin 2026) n'est pas couverte.
 - **Validité** : `TAUX_VERIFIES_JUSQU_AU = 2026-12-31` couvre le SMIC et `COTIS_2026`. Après cette date, aucune alerte SMIC n'est inventée, Ma paie avertit que les taux peuvent être faux, et `tests/run.mjs` échoue jusqu'à la vérification des nouveaux taux.
 
+## 1 ter ter. Vérifier un bulletin à lui seul — PROUVÉ (règles déjà codées)
+
+`verifierBulletinSeul` (`js/calc.js`) contrôle un bulletin lu en photo, sans pointages ni saisie, avec les **mêmes** règles que le calcul principal :
+
+- indemnité de fin = 10 % des salaires soumis du bulletin (base + heures sup + heures complémentaires + primes) — L1251-32 (intérim), L1243-8 (CDD) ;
+- congés payés = 10 % des salaires, IFM comprise en intérim, hors précarité en CDD par défaut — L1251-19, L1242-16 ;
+- taux horaire (base / heures) face au SMIC du mois (section 1 ter bis), en alerte seulement.
+- **Garde-fou** : si le brut lu ne retombe pas sur la somme des lignes lues (écart > 1 €), la lecture est jugée incomplète et aucun montant n'est annoncé.
+- **Limites** : une IFM ou une ICCP absente n'est pas réclamée (le contrat peut continuer, les congés peuvent avoir été pris) ; les heures sup ne sont pas recontrôlées sans les heures notées dans « Mes heures ».
+
 ## 1 quater. Lecture automatique du contrat — ce qui est fait
 
 - **PDF texte** : pdf.js 4.10.38 (Apache-2.0), embarqué dans `app/vendor/pdfjs/`. **PROUVÉ en test** : PDF généré → taux, agence, entreprise utilisatrice et 39 h extraits.

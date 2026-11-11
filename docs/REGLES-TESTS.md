@@ -28,6 +28,7 @@ Les montants viennent de `js/calc.js` et `js/compute.js`. Les tests historiques 
 | Réduction 11,31 % sur les heures sup seulement        | F2391                           | `run.mjs` §12 ; `rules.mjs` §18                     |
 | Heures complémentaires : pas de réduction             | INCONNU, non appliquée          | `rules.mjs` §18                                     |
 | Plafond 4 005 €, tranche 2, APEC, Alsace-Moselle      | F2302, URSSAF                   | `rules.mjs` §18                                     |
+| Bulletin vérifié seul : IFM, ICCP, SMIC, fiabilité    | L1251-32, L1251-19, L1243-8     | `run.mjs` §27 ; navigateur, photo du bulletin       |
 | SMIC 2026 (alerte) et date de validité des taux       | arrêté du 22/05/2026, A17008    | `run.mjs` §26 ; navigateur, Ma paie                 |
 | Brut → net comparé au moteur Urssaf                   | `modele-social` 11.1.0          | `urssaf.mjs` (non cadre, avec et sans heures sup)   |
 | Demande d'accès aux données                           | RGPD art. 12 et 15, CNIL        | `run.mjs` §9 ; navigateur, onglet Réclamer          |
