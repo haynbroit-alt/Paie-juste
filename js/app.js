@@ -4,6 +4,7 @@ import { deriveState } from "./calc.js";
 import { verifyChain } from "./chain.js";
 import { seedDemo } from "./demo.js";
 import { APP_VERSION } from "./version.js";
+import { META_KEYS } from "./sauvegarde.js";
 import pointer from "./modules/pointer.js";
 import paie from "./modules/paie.js";
 import reclamer from "./modules/reclamer.js";
@@ -29,7 +30,7 @@ const ctx = {
   async refresh(opts = {}) {
     this.records = await this.store.all();
     this.state = deriveState(this.records);
-    for (const k of ["profil", "netOpts", "currentContrat", "gps", "periodeDefaut"]) {
+    for (const k of META_KEYS) {
       this.meta[k] = await this.store.getMeta(k, null);
     }
     if (!this.meta.currentContrat || !this.state.contrats.has(this.meta.currentContrat)) {
