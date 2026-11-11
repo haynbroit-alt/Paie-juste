@@ -1,5 +1,19 @@
 # Journal des changements
 
+## 0.7.2 — 2026-11-11
+
+Fiche de paie d'agence d'intérim : lecture juste, et plus de faux écarts. Les montants de paie ne changent pas ; la vérification signale en plus une indemnité de fin de mission absente.
+
+- Cause 1 : la colonne « Calendrier » (« M 07 8,00 ») était prise pour le montant de la ligne. Elle est maintenant ignorée.
+- Cause 2 : « Hrs normales », « Hrs Sup », « Hrs Congés payés » n'étaient pas reconnus. Ils le sont (salaire de base, heures sup, congés pris).
+- Cause 3 : panier et trajet « soumis » (dans le brut) étaient comptés comme frais. Ils comptent maintenant dans le salaire.
+- Cause 4 : le net lu était parfois un total de l'employeur. Le net est le premier montant après « Net à payer ».
+- Cause 5 : la période écrite sur deux lignes et la page en double (original + copie) faussaient le mois et les totaux. Corrigé.
+- Cause 6 : sans contrat, un bulletin d'intérim était pris pour un CDI. L'intérim est reconnu (convention, code 7820Z, « fin de mission »).
+- Cause 7 : des frais lus sur le bulletin donnaient un faux écart (« attendu 0 € »). Sans heures notées ou sans montant attendu, il n'y a plus de comparaison.
+- Nouveau : si le contrat finit dans le mois et que l'indemnité de fin de mission manque, l'appli l'indique « ⚠️ à vérifier » avec le montant estimé (elle peut arriver sur le bulletin suivant).
+- Ma paie reste sur le mois du bulletin gardé, et « En bref » affiche le brut et le net du bulletin quand aucune heure n'est notée.
+
 ## 0.7.1 — 2026-11-11
 
 Correction : fiche de paie en PDF lue avec des chiffres au hasard. Les montants de paie ne changent pas.
