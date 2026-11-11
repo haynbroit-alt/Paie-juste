@@ -1,4 +1,14 @@
-import { fmtEur, fmtH, parisDate, TYPES, COTIS_2026, round2 } from "../calc.js";
+import {
+  fmtEur,
+  fmtH,
+  parisDate,
+  TYPES,
+  COTIS_2026,
+  round2,
+  SMIC,
+  tauxAJour,
+  TAUX_VERIFIES_JUSQU_AU,
+} from "../calc.js";
 import { computePeriod, contratRows, periodsOf, previsionMois, prescriptionInfo } from "../compute.js";
 import { esc, fmtMois, fmtJour, nowIso } from "../util.js";
 import { contratSelect, bindContratSelect } from "./pointer.js";
@@ -183,6 +193,16 @@ function resumeCard(ctx, P, periode, isCur) {
       <tr class="tot"><td>Net à recevoir</td><td class="r num">${fmtEur(net)}</td></tr>
       <tr><td>Mon bulletin</td><td class="r">${bulletin}</td></tr>
     </table>
+    ${
+      P.smic && P.smic.sous
+        ? `<p class="note bad" id="alerte-smic">Votre taux horaire (${fmtEur(P.smic.taux)}) est sous le SMIC (${fmtEur(P.smic.smic)} brut de l'heure), soit ${fmtEur(P.smic.ecart)} de moins par heure. Sauf apprenti ou moins de 18 ans, l'employeur doit payer au moins le SMIC. <a href="${SMIC.source}" target="_blank" rel="noopener">source</a></p>`
+        : ""
+    }
+    ${
+      tauxAJour(parisDate(nowIso()))
+        ? ""
+        : `<p class="note bad" id="alerte-taux">Les taux de cette version (SMIC, cotisations) ont été vérifiés jusqu'au ${TAUX_VERIFIES_JUSQU_AU.split("-").reverse().join("/")}. Mettez l'appli à jour : les montants peuvent être faux.</p>`
+    }
     <p class="small muted">Estimation, à vérifier.</p></div>`;
 }
 
