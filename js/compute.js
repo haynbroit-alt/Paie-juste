@@ -34,6 +34,7 @@ import {
   netEstime,
   joursOuvresRestants,
   tauxHoraire,
+  controleSmic,
   TYPES,
 } from "./calc.js";
 
@@ -128,7 +129,11 @@ export function computePeriod(state, id, periode, opts = {}) {
     weeks.set(r.week, w);
   }
   const net = netEstime(exp, opts.net || {});
+  // SMIC : celui du 1er jour du mois (il change toujours un 1er) ; pour tout le contrat, celui du dernier jour travaillé.
+  const dateSmic = periode === "contrat" ? (pr.length ? pr[pr.length - 1].date : null) : periode + "-01";
+  const smic = dateSmic ? controleSmic(c, dateSmic) : null;
   return {
+    smic,
     contrat: c,
     rows: pr,
     weeks: [...weeks.values()],

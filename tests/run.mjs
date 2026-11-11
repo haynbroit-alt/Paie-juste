@@ -14,6 +14,10 @@ import {
   tauxHoraire,
   prescriptionLimit,
   joursOuvresRestants,
+  smicHoraire,
+  controleSmic,
+  tauxAJour,
+  TAUX_VERIFIES_JUSQU_AU,
 } from "../js/calc.js";
 import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
@@ -545,6 +549,47 @@ console.log("=== 25. Sauvegarde chiffrée ===");
   );
   const app = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), "../js/app.js"), "utf8");
   t(/for \(const k of META_KEYS\)/.test(app), "l'appli relit tous les réglages à l'ouverture");
+}
+
+console.log("=== 26. SMIC et date de validité des taux ===");
+{
+  // Valeurs officielles : 12,02 € au 1er janvier 2026, 12,31 € au 1er juin 2026 (arrêté du 22 mai 2026).
+  t(smicHoraire("2026-01-01") === 12.02 && smicHoraire("2026-05-31") === 12.02, "SMIC janvier-mai 2026 : 12,02 €");
+  t(
+    smicHoraire("2026-06-01") === 12.31 && smicHoraire("2026-11-11") === 12.31,
+    "SMIC depuis le 1er juin 2026 : 12,31 €",
+  );
+  t(smicHoraire("2025-12-31") === null, "SMIC avant 2026 : inconnu, pas d'alerte");
+  t(smicHoraire("2027-01-01") === null, "SMIC après la date de vérification : inconnu, pas d'alerte inventée");
+  const a = controleSmic(normContrat({ type: "interim", taux: 12 }), "2026-06-15");
+  t(a.sous && a.ecart === 0.31, "intérim à 12,00 € en juin : sous le SMIC de 0,31 €/h");
+  t(
+    !controleSmic(normContrat({ type: "interim", taux: 12.31 }), "2026-06-15").sous,
+    "12,31 € en juin : au SMIC, pas d'alerte",
+  );
+  t(
+    !controleSmic(normContrat({ type: "cdi", taux: 12.1 }), "2026-05-15").sous,
+    "12,10 € en mai : au-dessus du SMIC de mai",
+  );
+  t(
+    controleSmic(normContrat({ type: "cdi", taux: 12.1 }), "2026-06-15").ecart === 0.21,
+    "12,10 € en juin : 0,21 €/h de moins",
+  );
+  // Mensuel 35 h : 1 867,02 € / 151,67 h = 12,31 €/h ; 1 823,03 € / 151,67 h = 12,02 €/h.
+  t(
+    !controleSmic(normContrat({ type: "cdi", mode: "mensuel", mensuel: 1867.02, hebdo: 35 }), "2026-06-15").sous,
+    "SMIC mensuel 1 867,02 € : pas d'alerte",
+  );
+  const m = controleSmic(normContrat({ type: "cdi", mode: "mensuel", mensuel: 1823.03, hebdo: 35 }), "2026-06-15");
+  t(m.sous && m.ecart === 0.29, "mensuel resté à 1 823,03 € après juin : 0,29 €/h de moins");
+  t(controleSmic(normContrat({ type: "cdi", taux: 0 }), "2026-06-15") === null, "taux vide : pas d'alerte");
+  t(tauxAJour("2026-12-31") && !tauxAJour("2027-01-01"), "les taux expirent après le 31/12/2026");
+  // Ce test échoue à partir du 1er janvier 2027 : vérifier SMIC et cotisations, puis avancer TAUX_VERIFIES_JUSQU_AU.
+  const auj = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
+  t(
+    tauxAJour(auj),
+    `taux vérifiés jusqu'au ${TAUX_VERIFIES_JUSQU_AU} (aujourd'hui ${auj}) : sinon, mettre à jour SMIC et cotisations`,
+  );
 }
 
 runRules(t, eq);

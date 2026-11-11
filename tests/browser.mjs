@@ -233,6 +233,7 @@ console.log("=== Mes heures : autre jour et rappels ===");
   await click(p, "#go-paie");
   await wait(500);
   t(!!(await p.$(".forecast")), "bouton « détail de mon salaire » → onglet Ma paie");
+  t(!!(await p.$("#alerte-smic")), "taux de 12,00 € : alerte SMIC affichée dans Ma paie");
   const res = await txt(p, "#resume");
   t(
     res.includes("Heures travaillées") && res.includes("Net à recevoir") && res.includes("Mon bulletin"),

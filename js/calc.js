@@ -185,6 +185,56 @@ export const COTIS_2026 = Object.freeze({
   reductionHS: 0.1131, // service-public F2391 : exonération vieillesse sur HS, limite 11,31 %
 });
 
+/**
+ * Date jusqu'à laquelle les taux codés (COTIS_2026, SMIC) ont été vérifiés.
+ * Après cette date, l'appli prévient que les montants peuvent être faux, et `tests/run.mjs` échoue
+ * pour obliger à vérifier les nouveaux taux (SMIC et cotisations changent au 1er janvier).
+ */
+export const TAUX_VERIFIES_JUSQU_AU = "2026-12-31";
+
+/**
+ * SMIC horaire brut (métropole). Sources : service-public A17008 (12,02 € au 1er janvier 2026),
+ * arrêté du 22 mai 2026 et service-public A18916 (12,31 € au 1er juin 2026). Lus le 11/11/2026.
+ * Non couverts : Mayotte (montant différent), abattements des moins de 18 ans, apprentis.
+ */
+export const SMIC = Object.freeze({
+  source: "https://code.travail.gouv.fr/contribution/quel-est-le-salaire-minimum",
+  historique: Object.freeze([
+    Object.freeze({ depuis: "2026-01-01", horaire: 12.02 }),
+    Object.freeze({ depuis: "2026-06-01", horaire: 12.31 }),
+  ]),
+});
+
+/** Les taux codés sont-ils encore valables à cette date (AAAA-MM-JJ) ? @param {string} dateStr */
+export const tauxAJour = (dateStr) => dateStr <= TAUX_VERIFIES_JUSQU_AU;
+
+/**
+ * SMIC horaire en vigueur à une date, ou null s'il n'est pas connu (avant 2026, ou taux non vérifiés).
+ * @param {string} dateStr AAAA-MM-JJ
+ * @returns {number|null}
+ */
+export function smicHoraire(dateStr) {
+  if (!dateStr || !tauxAJour(dateStr)) return null;
+  let v = null;
+  for (const h of SMIC.historique) if (dateStr >= h.depuis) v = h.horaire;
+  return v;
+}
+
+/**
+ * Compare le taux horaire du contrat au SMIC. Alerte seulement : le montant attendu n'est pas modifié,
+ * car un apprenti ou un salarié de moins de 18 ans peut légalement être payé moins.
+ * @param {ContratNorm} c
+ * @param {string} dateStr
+ * @returns {{ smic: number, taux: number, ecart: number, sous: boolean } | null}
+ */
+export function controleSmic(c, dateStr) {
+  const smic = smicHoraire(dateStr);
+  const taux = tauxHoraire(c);
+  if (smic == null || !(taux > 0)) return null;
+  const t = Math.round(taux * 10000) / 10000;
+  return { smic, taux: t, ecart: round2(smic - t), sous: t < smic - 0.004 };
+}
+
 /** @param {number} x */
 export function cents(x) {
   return Math.round(x * 100 + (x >= 0 ? 1e-7 : -1e-7));

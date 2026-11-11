@@ -1,5 +1,12 @@
 # Journal des changements
 
+## 0.6.0 — 2026-11-11
+
+Deux contrôles de sécurité. Les montants de paie ne changent pas.
+
+- Ma paie : alerte si le taux horaire du contrat est sous le SMIC du mois (12,02 € de janvier à mai 2026, 12,31 € depuis le 1er juin 2026), avec l'écart par heure. C'est une alerte, pas un montant réclamé : un apprenti ou un salarié de moins de 18 ans peut légalement être payé moins.
+- Les taux codés (SMIC, cotisations 2026) ont maintenant une date de validité : le 31/12/2026. Après cette date, Ma paie prévient que les montants peuvent être faux, et les tests automatiques échouent tant que les nouveaux taux ne sont pas vérifiés.
+
 ## 0.5.0 — 2026-11-11
 
 Ne plus rien perdre si le téléphone casse. Les montants de paie ne changent pas.

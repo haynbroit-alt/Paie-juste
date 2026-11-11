@@ -65,6 +65,13 @@ Source : [service-public F2302 « Cotisations salariales »](https://www.service
 - **Contrôle** : au SMIC du 1er juin 2026 (1 867,02 € brut, [service-public F2301](https://www.service-public.gouv.fr/particuliers/vosdroits/F2301)), l'appli trouve 389,09 € de cotisations, 1 477,93 € net et 1 531,12 € net imposable. Ces trois montants concordent avec un calcul publié par un site non officiel (purpay.fr), qui dit retrouver « le SMIC net indicatif publié par service-public ». Ce test automatique fait partie de `tests/run.mjs`.
 - **INCONNU, non codé (saisie libre)** : mutuelle et prévoyance (montant mensuel saisi), part patronale de la mutuelle réintégrée dans le net imposable, taux réduits, apprentis, salariés de 65 ans et plus, exonérations particulières, régularisation annuelle du plafond. **Le net reste une estimation.**
 
+## 1 ter bis. SMIC et validité des taux — PROUVÉ (alerte seulement)
+
+- **SMIC horaire brut, métropole** : 12,02 € au 1er janvier 2026 ([service-public A17008](https://www.service-public.gouv.fr/particuliers/actualites/A17008), [DARES](https://dares.travail-emploi.gouv.fr/publication/la-revalorisation-du-smic-au-1er-janvier-2026)) ; 12,31 € au 1er juin 2026, revalorisation automatique de 2,41 % ([arrêté du 22 mai 2026](https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000054126589), [service-public A18916](https://www.service-public.gouv.fr/particuliers/actualites/A18916), [Code du travail numérique](https://code.travail.gouv.fr/actualite/le-smic-augmente-au-1er-juin-2026-etes-vous-concerne)). Lus le 11/11/2026.
+- **Codé** : `controleSmic` compare le taux horaire du contrat (mensuel : salaire / (heures × 52 / 12)) au SMIC du 1er jour du mois. Si le taux est inférieur, Ma paie affiche une alerte avec l'écart par heure ([fiche du Code du travail numérique](https://code.travail.gouv.fr/contribution/quel-est-le-salaire-minimum)).
+- **Pas de montant ajouté au total réclamé** : **INCONNU** pour les moins de 18 ans (abattements) et les apprentis, qui peuvent être payés sous le SMIC. Mayotte (9,56 € depuis le 1er juin 2026) n'est pas couverte.
+- **Validité** : `TAUX_VERIFIES_JUSQU_AU = 2026-12-31` couvre le SMIC et `COTIS_2026`. Après cette date, aucune alerte SMIC n'est inventée, Ma paie avertit que les taux peuvent être faux, et `tests/run.mjs` échoue jusqu'à la vérification des nouveaux taux.
+
 ## 1 quater. Lecture automatique du contrat — ce qui est fait
 
 - **PDF texte** : pdf.js 4.10.38 (Apache-2.0), embarqué dans `app/vendor/pdfjs/`. **PROUVÉ en test** : PDF généré → taux, agence, entreprise utilisatrice et 39 h extraits.
