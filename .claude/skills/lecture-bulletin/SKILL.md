@@ -24,6 +24,10 @@ La lecture **propose**, la personne **valide**. Elle ne calcule rien et n'enregi
 5. Relancer **tous** les cas existants : un nouveau modèle ne doit pas casser les anciens.
 6. Pour l'OCR, ajouter ou compléter une fixture HTML dans `tests/fixtures/`, que `tests/browser.mjs` photographie puis lit (comme `bulletin.html`).
 
+## PDF de logiciel de paie
+
+Les cases sont souvent écrites une par une, dans le désordre (colonne par colonne), sans espace. `itemsToLines` (`js/importer.js`) reconstruit les lignes d'après la position : ne jamais revenir à une lecture dans l'ordre du fichier. Tester tout changement avec `tests/fixtures/bulletin-cases.pdf` (généré par `bulletin-cases.py`, modifiable pour reproduire un nouveau modèle).
+
 ## Formats de nombres à gérer
 
 `1 823,07` · `1.823,07` · `1823,07` · `1823.07` · espaces insécables · taux à 4 décimales (`12,0200`) · montants négatifs (retenues).

@@ -356,6 +356,26 @@ console.log("=== Photo du bulletin de paie (OCR local) ===");
   await p.close();
 }
 
+console.log("=== Fiche de paie en PDF de logiciel de paie (cases dans le désordre) ===");
+{
+  const p = await newPage();
+  await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(500);
+  await (await p.$("#bi-file")).uploadFile(FIX + "/bulletin-cases.pdf");
+  await p.waitForSelector("#bi-garder", { timeout: 30000 }).catch(() => {});
+  const res = await txt(p, "#verif");
+  t(
+    /Octobre 2026/i.test(res) && res.includes("213,35 € reçus"),
+    "PDF colonne par colonne : IFM 213,35 € lue sur la bonne ligne",
+  );
+  t(
+    res.includes("234,68 € reçus") && !res.includes("Photo mal lue"),
+    "PDF colonne par colonne : congés payés lus, lecture fiable",
+  );
+  if (!res.includes("213,35")) console.log(res.slice(0, 1200));
+  await p.close();
+}
+
 console.log("=== Fiche de paie sans contrat : tout automatique ===");
 {
   const p = await newPage();
