@@ -24,6 +24,7 @@ import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
 import { parseContrat } from "../js/contrat-parse.js";
 import { parseBulletin } from "../js/bulletin-parse.js";
+import { itemsToLines } from "../js/importer.js";
 import { chiffrer, dechiffrer, estSauvegardeChiffree, codeValide, META_KEYS, ITERATIONS } from "../js/sauvegarde.js";
 import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
 import { demoPartials } from "../js/demo.js";
@@ -626,6 +627,35 @@ console.log("=== 27. Vérifier un bulletin à lui seul (sans saisie) ===");
     "CDI : pas d'indemnité de fin à contrôler",
   );
   t(verifierBulletinSeul({}, { type: "interim" }).lignes.length === 0, "bulletin vide : rien à contrôler");
+}
+
+console.log("=== 28. PDF de logiciel de paie : cases écrites colonne par colonne ===");
+{
+  const it = (str, x, y) => ({ str, transform: [9, 0, 0, 9, x, y], width: str.length * 4.5, height: 9 });
+  // Ordre du fichier : toute la colonne des libellés, puis chaque colonne de chiffres, sans espace.
+  const items = [
+    it("Salaire de base", 40, 760),
+    it("SALAIRE BRUT", 40, 742),
+    it("151,67", 270, 760),
+    it("12,0200", 330, 760),
+    it("1 823,07", 420, 760),
+    it("1 823,07", 420, 742),
+  ];
+  const lignes = itemsToLines(items);
+  t(lignes.length === 2, "2 lignes reconstruites d'après la position");
+  t(
+    /^Salaire de base\s+151,67\s+12,0200\s+1 823,07$/.test(lignes[0]),
+    "libellé et montants remis sur la même ligne : " + lignes[0],
+  );
+  const c = parseBulletin(lignes.join("\n")).champs;
+  t(
+    c.base.value === 1823.07 && c.heures.value === 151.67 && c.brut.value === 1823.07,
+    "montants lus sans chiffres au hasard",
+  );
+  const colles = itemsToLines([it("151,67", 100, 500), it("12,0200", 128, 500)]);
+  t(colles[0] !== "151,6712,0200" && colles[0].includes(" "), "deux cases voisines ne sont jamais collées");
+  const lettres = itemsToLines([it("B", 40, 400), it("RUT", 44.6, 400)]);
+  t(lettres[0] === "BRUT", "lettres d'un même mot recollées");
 }
 
 runRules(t, eq);

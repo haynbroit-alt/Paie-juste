@@ -1,5 +1,13 @@
 # Journal des changements
 
+## 0.7.1 — 2026-11-11
+
+Correction : fiche de paie en PDF lue avec des chiffres au hasard. Les montants de paie ne changent pas.
+
+- Cause : beaucoup de logiciels de paie écrivent chaque case du tableau à part, colonne par colonne, sans espace. L'appli lisait le texte dans l'ordre du fichier : les libellés d'un côté, les montants de l'autre, ou des nombres collés entre eux (« 151,6712,0200 »).
+- Correction : chaque ligne est reconstruite d'après la position du texte sur la page (de haut en bas, puis de gauche à droite), avec un espace entre deux cases et jamais deux nombres collés.
+- Nouveau test : un PDF écrit colonne par colonne (`tests/fixtures/bulletin-cases.pdf`, généré par `bulletin-cases.py`) est lu dans le navigateur.
+
 ## 0.7.0 — 2026-11-11
 
 La fiche de paie se vérifie toute seule. Les montants de paie ne changent pas.
