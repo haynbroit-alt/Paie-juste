@@ -103,7 +103,8 @@ export function computePeriod(state, id, periode, opts = {}) {
   };
   const exp = expectedPay(pr, c, primes, calcOpts);
   const egalite = egaliteEcart(pr, c, primes, calcOpts);
-  const cmp = compareBulletin(exp, bulletin, { egalite });
+  // Sans heures notées pour la période, comparer le bulletin à « 0 h attendues » n'aurait pas de sens.
+  const cmp = compareBulletin(exp, pr.length ? bulletin : null, { egalite });
   const weeks = new Map();
   for (const r of pr) {
     const w = weeks.get(r.week) || {

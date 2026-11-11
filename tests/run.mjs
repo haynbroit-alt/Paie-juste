@@ -658,6 +658,69 @@ console.log("=== 28. PDF de logiciel de paie : cases écrites colonne par colonn
   t(lettres[0] === "BRUT", "lettres d'un même mot recollées");
 }
 
+console.log("=== 29. Bulletin d'agence d'intérim : colonne calendrier, page en double (fictif) ===");
+{
+  const page = [
+    "BULLETIN DE PAYE",
+    "Période de paye",
+    "du 02/03/2026 au 27/03/2026",
+    "AGENCE EXEMPLE   Convention.Coll. Travail Temporaire",
+    "Contrat 99999 MACON (N2P1) . 02/03/2026 27/03/2026   Av..",
+    "N°   Rubrique   Base   Taux   Payer   Retenir   Patronales Calendrier",
+    "1100 Hrs travaillées   140,000   L 02",
+    "1110 Hrs normales °   135,000   14,000   1 890,00   M 03",
+    "1120 .Hrs Sup 125%   5,000   17,500   87,50   J 04   8,00",
+    "1522 Panier Jour Soumis   20,000   2,800   56,00   V 05",
+    "1534 Trajet Z1b   20,000   2,060   41,20   L 09   8,00",
+    "Total Brut total *   2 074,70   M 10   8,00",
+    "Sécurité sociale plafonnée   2 074,700   6,900   -143,15   -177,39 M 11   C",
+    "CSG/CRDS sur heures supp. non déductible de l'impôt sur le r   87,500   9,700   -8,49   J 12",
+    "Intempérie   7,000   10,500   73,50   S 14",
+    "Total NET APAYER AVANT IMPOTS SUR LE REVENU   1 600,00   Ap..",
+    "5275 Indem. de panier BTP   20,000   10,400   208,00   99999",
+    "Payé par Virement le 10/04/26   Net à payer 1808,00 Eur   l'employeur   2 700,00",
+    "Cumuls   Hrs travaillées   Salaire brut   Brut abattu",
+    "Mensuel   140,00   2074,70   2074,70",
+  ];
+  const r = parseBulletin([...page, ...page].join("\n"));
+  const v = Object.fromEntries(Object.entries(r.champs).map(([k, f]) => [k, f.value]));
+  t(r.periode === "2026-03", "période sur deux lignes : mars 2026");
+  t(r.finContrat === "2026-03-27", "fin du contrat lue : 27/03/2026");
+  t(r.interim === true, "intérim reconnu sur le bulletin (« Travail Temporaire »)");
+  t(
+    parseBulletin("Salaire de base 151,67 12,00 1 820,00").interim === false,
+    "bulletin sans mot d'intérim : pas intérim",
+  );
+  t(v.brut === 2074.7, "colonne calendrier ignorée : brut 2 074,70 € (et non 8,00)");
+  t(v.base === 1890 && v.heures === 135, "« Hrs normales » : 135 h, 1 890 €");
+  t(v.hs === 87.5, "« .Hrs Sup 125% » : 87,50 €");
+  t(v.primes === 97.2, "panier et trajet écrits avant le brut : soumis, 97,20 €");
+  t(v.frais === 208 && v.intemperies === 73.5, "panier BTP après le net : frais 208 € ; intempéries à part");
+  t(v.net === 1808 && v.netAvantImpot === 1600, "net à payer 1 808 € (et non le total employeur)");
+  t(!("csg" in v) && v.hs === 87.5, "ligne CSG sur heures sup ignorée");
+  // Page en double : rien n'est compté deux fois.
+  // Vérification : IFM 10 % × 2 074,70 = 207,47 € ; ICCP 10 % × (2 074,70 + 207,47) = 228,22 €.
+  const res = verifierBulletinSeul(v, { type: "interim", periode: r.periode, finContrat: r.finContrat });
+  const L = Object.fromEntries(res.lignes.map((l) => [l.key, l]));
+  t(res.fiable, "brut = somme des lignes lues : lecture fiable");
+  t(
+    res.aVerifier && L.fin.alerte && L.fin.attendu === 207.47,
+    "contrat terminé sans IFM : à vérifier, environ 207,47 €",
+  );
+  t(L.iccp.alerte && L.iccp.attendu === 228.22, "sans ICCP : à vérifier, environ 228,22 € (IFM comprise)");
+  t(res.manque === 0, "rien n'est annoncé comme dû : seulement « à vérifier »");
+  t(!res.smic.sous, "14,00 €/h en mars : au-dessus du SMIC");
+  const continue_ = verifierBulletinSeul(v, { type: "interim", periode: r.periode, finContrat: "2026-04-30" });
+  t(!continue_.aVerifier, "contrat qui continue le mois suivant : pas d'alerte");
+  // Frais lus sur le bulletin mais jamais saisis : affichés, sans écart inventé (avant : « −306,21 € »).
+  const cI = normContrat({ type: "interim", taux: 15 });
+  const { rows: rI } = splitWeekly(new Map([["2026-03-02", 420]]), cI);
+  const cmpF = compareBulletin(expectedPay(rI, cI, [], {}), { frais: 306.21, base: 105 });
+  const fr = cmpF.lines.find((l) => l.key === "frais");
+  t(fr.recu === 306.21 && fr.ecart === null, "frais non saisis : montant lu affiché, pas d'écart");
+  t(cmpF.lines.find((l) => l.key === "base").ecart === 0, "salaire de base toujours comparé");
+}
+
 runRules(t, eq);
 runSecurity(t);
 

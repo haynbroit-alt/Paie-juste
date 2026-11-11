@@ -754,8 +754,11 @@ export function compareBulletin(exp, bulletin, extra = {}) {
   for (const d of defs) {
     let raw = b[d.key];
     if (d.key === "fin" && (raw === undefined || raw === "")) raw = b.ifm;
-    const has = raw !== undefined && raw !== null && raw !== "" && Number.isFinite(Number(raw));
-    const recu = has ? Number(raw) : null;
+    // Prime ou frais lus sur le bulletin mais jamais saisis : l'appli n'en connaît pas le montant, pas d'écart inventé.
+    const inconnu = d.regle === "saisie" && !d.attendu;
+    const lu = raw !== undefined && raw !== null && raw !== "" && Number.isFinite(Number(raw));
+    const has = lu && !inconnu;
+    const recu = lu ? Number(raw) : null;
     const ecart = has && recu != null ? round2(d.attendu - recu) : null;
     if (has && ecart != null) {
       compared++;
@@ -829,22 +832,25 @@ export function fmtEur(x) {
  * - congés payés (ICCP) = 10 % des salaires, IFM comprise en intérim (L1251-19, L1242-16).
  * Si le brut lu ne correspond pas à la somme des lignes lues, la lecture est jugée incomplète :
  * aucun montant n'est alors annoncé comme dû.
- * @param {Record<string, number|undefined>} b montants lus (heures, base, hs, hc, primes, fin, iccp, brut)
- * @param {{ type?: string, periode?: string, rules?: Partial<typeof DEFAULT_RULES> }} [opts]
+ * @param {Record<string, number|undefined>} b montants lus (heures, base, hs, hc, primes, conges, fin, iccp, brut)
+ * @param {{ type?: string, periode?: string, finContrat?: string|null, rules?: Partial<typeof DEFAULT_RULES> }} [opts]
  */
 export function verifierBulletinSeul(b, opts = {}) {
   const r = { ...DEFAULT_RULES, ...(opts.rules || {}) };
   /** @param {unknown} v */
   const c = (v) => (typeof v === "number" && Number.isFinite(v) ? cents(v) : 0);
-  const salairesC = c(b.base) + c(b.hs) + c(b.hc) + c(b.primes);
-  /** @type {Array<{ key: string, label: string, attendu: number, recu: number|null, ecart: number, ok: boolean|null, regle: string, note: string }>} */
+  // Congés pris pendant la mission (« Hrs Congés payés ») : payés comme du salaire, comptés dans le brut.
+  const salairesC = c(b.base) + c(b.hs) + c(b.hc) + c(b.primes) + c(b.conges);
+  /** @type {Array<{ key: string, label: string, attendu: number, recu: number|null, ecart: number, ok: boolean|null, regle: string, note: string, alerte: boolean }>} */
   const lignes = [];
   const interim = opts.type === "interim";
   const finType = opts.type === "interim" || opts.type === "cdd";
   const T = finType ? TYPES[/** @type {"interim"|"cdd"} */ (opts.type)] : null;
   const seuil = cents(r.seuilEcartEuros);
-  /** @param {string} key @param {string} label @param {number} attC @param {unknown} recu @param {string} regle @param {string} absent */
-  const ligne = (key, label, attC, recu, regle, absent) => {
+  // Contrat ou mission terminé pendant le mois du bulletin : une indemnité absente devient « à vérifier ».
+  const finDansMois = !!(opts.finContrat && opts.periode && opts.finContrat.slice(0, 7) === opts.periode);
+  /** @param {string} key @param {string} label @param {number} attC @param {unknown} recu @param {string} regle @param {string} absent @param {string} [pourquoi] */
+  const ligne = (key, label, attC, recu, regle, absent, pourquoi = "") => {
     const recuC = typeof recu === "number" && Number.isFinite(recu) ? cents(recu) : null;
     const ecartC = recuC == null ? 0 : attC - recuC;
     lignes.push({
@@ -855,7 +861,13 @@ export function verifierBulletinSeul(b, opts = {}) {
       ecart: ecartC / 100,
       ok: recuC == null ? null : ecartC <= seuil,
       regle,
-      note: recuC == null ? absent : "",
+      note:
+        recuC == null
+          ? finDansMois
+            ? `Pas sur ce bulletin alors que le contrat se termine le ${/** @type {string} */ (opts.finContrat).split("-").reverse().join("/")} : à vérifier (environ ${(attC / 100).toFixed(2).replace(".", ",")} €). Elle peut arriver sur le bulletin suivant${pourquoi}.`
+            : absent
+          : "",
+      alerte: recuC == null && finDansMois,
     });
     return ecartC;
   };
@@ -869,9 +881,11 @@ export function verifierBulletinSeul(b, opts = {}) {
       b.fin,
       T.finArt,
       "Pas sur ce bulletin : normal si le contrat continue.",
+      ", ou ne pas être due (renouvellement, CDI, faute grave)",
     );
     if (e > seuil) manqueC += e;
-    const baseIccpC = salairesC + (interim && typeof b.fin === "number" ? finAttC : 0);
+    // Intérim : congés payés calculés IFM comprise (L1251-19), y compris quand l'IFM est attendue mais absente.
+    const baseIccpC = salairesC + (interim && (typeof b.fin === "number" || finDansMois) ? finAttC : 0);
     const e2 = ligne(
       "iccp",
       "Congés payés (10 %)",
@@ -894,5 +908,6 @@ export function verifierBulletinSeul(b, opts = {}) {
       smic = { smic: s, taux, sous, manque: sous ? round2((s - taux) * b.heures) : 0 };
     }
   }
-  return { lignes, manque: fiable ? manqueC / 100 : 0, fiable, smic, salaires: salairesC / 100 };
+  const aVerifier = fiable && lignes.some((l) => l.alerte);
+  return { lignes, manque: fiable ? manqueC / 100 : 0, fiable, smic, aVerifier, salaires: salairesC / 100 };
 }

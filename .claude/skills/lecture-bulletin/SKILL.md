@@ -28,6 +28,14 @@ La lecture **propose**, la personne **valide**. Elle ne calcule rien et n'enregi
 
 Les cases sont souvent écrites une par une, dans le désordre (colonne par colonne), sans espace. `itemsToLines` (`js/importer.js`) reconstruit les lignes d'après la position : ne jamais revenir à une lecture dans l'ordre du fichier. Tester tout changement avec `tests/fixtures/bulletin-cases.pdf` (généré par `bulletin-cases.py`, modifiable pour reproduire un nouveau modèle).
 
+## Bulletins d'agence d'intérim
+
+- Colonne « Calendrier » en bout de ligne (« M 07 8,00 ») : retirée avant de lire les montants (`CALENDRIER`).
+- Page en double (original + copie) : chaque ligne identique ne compte qu'une fois.
+- Panier / trajet écrits avant le brut ou « soumis » : salaire (`primes`), pas frais.
+- Totaux : le montant est le premier nombre après le mot-clé (« Net à payer » ≠ total employeur).
+- Sans contrat, l'intérim se devine (convention, 7820Z, « fin de mission ») : sinon l'IFM n'est pas contrôlée.
+
 ## Formats de nombres à gérer
 
 `1 823,07` · `1.823,07` · `1823,07` · `1823.07` · espaces insécables · taux à 4 décimales (`12,0200`) · montants négatifs (retenues).

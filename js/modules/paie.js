@@ -17,7 +17,7 @@ import { parseBulletin } from "../bulletin-parse.js";
 
 const ui = { periode: null, avecFin: null };
 /** Lecture d'un bulletin (photo ou PDF) : état de l'écran, rien n'est enregistré ici. */
-const bimp = { progress: null, error: "", champs: null, periode: null, fill: null, raw: "" };
+const bimp = { progress: null, error: "", champs: null, periode: null, finContrat: null, fill: null, raw: "" };
 const NOMS_CHAMPS = {
   heures: "Heures payées",
   base: "Salaire de base",
@@ -27,7 +27,10 @@ const NOMS_CHAMPS = {
   fin: "Indemnité de fin (IFM / précarité)",
   iccp: "Congés payés (ICCP)",
   frais: "Indemnités de frais",
+  conges: "Congés payés pris (salaire)",
+  intemperies: "Indemnités intempéries",
   brut: "Salaire brut (pour vérifier)",
+  netAvantImpot: "Net avant impôt (pour vérifier)",
   net: "Net à payer (pour vérifier)",
 };
 
@@ -61,9 +64,24 @@ function analyserBulletin(text) {
   const r = parseBulletin(text);
   bimp.champs = r.champs;
   bimp.periode = r.periode;
+  bimp.finContrat = r.finContrat || null;
+  bimp.interim = !!r.interim;
 }
 
-const CHAMPS_BULLETIN = ["heures", "base", "hc", "hs", "primes", "fin", "iccp", "frais"];
+const CHAMPS_BULLETIN = [
+  "heures",
+  "base",
+  "hc",
+  "hs",
+  "primes",
+  "conges",
+  "fin",
+  "iccp",
+  "frais",
+  "intemperies",
+  "brut",
+  "net",
+];
 function valeursLues() {
   /** @type {Record<string, number>} */
   const v = {};
@@ -73,6 +91,7 @@ function valeursLues() {
 /** Type de contrat : celui du contrat, sinon deviné sur le bulletin (une IFM = intérim). */
 function typeDevine(c) {
   if (c) return c.type;
+  if (bimp.interim) return "interim";
   const f = bimp.champs && bimp.champs.fin;
   if (!f) return "cdi";
   return /mission|ifm/i.test(f.extrait) ? "interim" : "cdd";
@@ -93,16 +112,23 @@ function verifCard(c, periodeCourante) {
       ${etat}${coller}</div>`;
   }
   const periode = bimp.periode || periodeCourante;
-  const v = verifierBulletinSeul(valeursLues(), { type: typeDevine(c), periode, rules: c ? c.rules : undefined });
+  const v = verifierBulletinSeul(valeursLues(), {
+    type: typeDevine(c),
+    periode,
+    finContrat: bimp.finContrat,
+    rules: c ? c.rules : undefined,
+  });
   const verdict = !v.fiable
     ? `<p class="verdict bad">⚠️ Photo mal lue : des montants manquent. Reprenez la photo.</p>`
     : v.manque > 0
       ? `<p class="verdict bad">❌ Il manque environ ${fmtEur(v.manque)}</p>`
       : v.smic && v.smic.sous
         ? `<p class="verdict bad">❌ Votre taux horaire est sous le SMIC</p>`
-        : `<p class="verdict ok">✅ Tout est bon sur ce bulletin</p>`;
-  const item = (ok, txt) =>
-    `<li><span class="ic">${ok === true ? "✅" : ok === false ? "❌" : "➖"}</span><span>${txt}</span></li>`;
+        : v.aVerifier
+          ? `<p class="verdict bad">⚠️ À vérifier : contrat terminé, indemnités de fin absentes</p>`
+          : `<p class="verdict ok">✅ Tout est bon sur ce bulletin</p>`;
+  const item = (ok, txt, alerte) =>
+    `<li><span class="ic">${alerte ? "⚠️" : ok === true ? "✅" : ok === false ? "❌" : "➖"}</span><span>${txt}</span></li>`;
   const items = [
     ...(v.smic
       ? [
@@ -120,6 +146,7 @@ function verifCard(c, periodeCourante) {
         l.recu == null
           ? `${esc(l.label)} : ${esc(l.note)}`
           : `${esc(l.label)} : ${fmtEur(l.recu)} reçus, ${fmtEur(l.attendu)} attendus${l.ok ? "" : ` — il manque ${fmtEur(l.ecart)}`}.`,
+        l.alerte,
       ),
     ),
   ];
@@ -174,10 +201,10 @@ function bindVerif(ctx, el, c, periodeCourante) {
         await ctx.setMeta("currentContrat", r.id);
         contratId = r.id;
       }
-      const data = { contratId, periode, source: "photo" };
+      const data = { contratId, periode, source: "photo", ...(bimp.finContrat ? { finContrat: bimp.finContrat } : {}) };
       for (const k of CHAMPS_BULLETIN) if (typeof v[k] === "number") data[k] = v[k];
       await ctx.append("bulletin", data);
-      Object.assign(bimp, { champs: null, raw: "", periode: null });
+      Object.assign(bimp, { champs: null, raw: "", periode: null, finContrat: null });
       ui.periode = periode;
       ctx.toast(c ? "Bulletin gardé." : "Bulletin gardé. Contrat créé : complétez-le dans « Contrat ».");
       await ctx.refresh();
@@ -187,7 +214,12 @@ function bindVerif(ctx, el, c, periodeCourante) {
 export function selectedPeriod(ctx) {
   const c = ctx.state.contrats.get(ctx.meta.currentContrat);
   if (!c) return null;
-  const months = periodsOf(contratRows(ctx.state, c.id).rows);
+  // Mois avec des heures notées, et mois dont un bulletin a été gardé (même sans heures).
+  const avecBulletin = [...ctx.state.bulletins.keys()]
+    .filter((k) => k.startsWith(c.id + "|"))
+    .map((k) => k.slice(c.id.length + 1))
+    .filter((m) => /^\d{4}-\d{2}$/.test(m));
+  const months = [...new Set([...periodsOf(contratRows(ctx.state, c.id).rows), ...avecBulletin])].sort();
   const cur = parisDate(nowIso()).slice(0, 7);
   const q = new URLSearchParams(location.search).get("periode");
   if (!ui.periode && (q || ctx.meta.periodeDefaut)) ui.periode = q || ctx.meta.periodeDefaut;
@@ -293,27 +325,51 @@ function forecast(ctx, P, isCur) {
     <span class="tag warn">estimation</span></div>`;
 }
 
+/** État d'un bulletin gardé quand aucune heure n'est notée : la vérification du bulletin seul. */
+function verdictBulletinGarde(P) {
+  const b = P.bulletin;
+  const v = verifierBulletinSeul(b, {
+    type: P.contrat.type,
+    periode: b.periode,
+    finContrat: b.finContrat || null,
+    rules: P.contrat.rules,
+  });
+  if (!v.fiable) return `<span>gardé, lecture incomplète</span>`;
+  if (v.manque > 0) return `<b style="color:var(--red)">il manque ${fmtEur(v.manque)}</b>`;
+  if (v.smic && v.smic.sous) return `<b style="color:var(--red)">taux sous le SMIC</b>`;
+  if (v.aVerifier) return `<b style="color:var(--amber)">⚠️ fin de contrat à vérifier</b>`;
+  return `<b style="color:var(--green)">gardé ✓</b>`;
+}
+
 function resumeCard(ctx, P, periode, isCur) {
   const m = P.exp.minutes;
   const sup = m.hs1 + m.hs2 + m.hc1 + m.hc2;
   const prev = isCur
     ? previsionMois(ctx.state, P.contrat.id, parisDate(nowIso()), { net: ctx.meta.netOpts || {} })
     : null;
-  const brut = prev ? prev.brutFin : P.exp.brut;
-  const net = (prev ? prev.netFin : P.net).netVerse;
+  // Aucune heure notée mais un bulletin gardé : on montre ce que dit le bulletin plutôt que 0 €.
+  const duBulletin = !m.total && P.bulletin && typeof P.bulletin.brut === "number";
+  const brut = duBulletin ? P.bulletin.brut : prev ? prev.brutFin : P.exp.brut;
+  const net = duBulletin
+    ? typeof P.bulletin.net === "number"
+      ? P.bulletin.net
+      : null
+    : (prev ? prev.netFin : P.net).netVerse;
   const v = P.cmp.verdict;
   const bulletin =
     v === "doit"
       ? `<b style="color:var(--red)">il manque ${fmtEur(P.cmp.total)}</b>`
       : v === "ordre" || v === "trop_percu"
         ? `<b style="color:var(--green)">conforme ✓</b>`
-        : `<a href="#verif">📷 à vérifier ↑</a>`;
+        : P.bulletin
+          ? verdictBulletinGarde(P)
+          : `<a href="#verif">📷 à vérifier ↑</a>`;
   return `<div class="card resume" id="resume"><h2>En bref</h2>
     <table class="resume">
-      <tr><td>Heures travaillées</td><td class="r num">${fmtH(m.total)}</td></tr>
+      <tr><td>Heures travaillées</td><td class="r num">${duBulletin && P.bulletin.heures ? fmtH(Math.round(P.bulletin.heures * 60)) + " payées" : fmtH(m.total)}</td></tr>
       ${sup ? `<tr><td>dont heures sup</td><td class="r num">${fmtH(sup)}</td></tr>` : ""}
-      <tr><td>Salaire brut${prev ? " prévu" : ""}</td><td class="r num">${fmtEur(brut)}</td></tr>
-      <tr class="tot"><td>Net à recevoir</td><td class="r num">${fmtEur(net)}</td></tr>
+      <tr><td>Salaire brut${duBulletin ? " (bulletin)" : prev ? " prévu" : ""}</td><td class="r num">${fmtEur(brut)}</td></tr>
+      <tr class="tot"><td>${duBulletin ? "Net payé (bulletin)" : "Net à recevoir"}</td><td class="r num">${net == null ? "—" : fmtEur(net)}</td></tr>
       <tr><td>Mon bulletin</td><td class="r">${bulletin}</td></tr>
     </table>
     ${
@@ -326,6 +382,7 @@ function resumeCard(ctx, P, periode, isCur) {
         ? ""
         : `<p class="note bad" id="alerte-taux">Les taux de cette version (SMIC, cotisations) ont été vérifiés jusqu'au ${TAUX_VERIFIES_JUSQU_AU.split("-").reverse().join("/")}. Mettez l'appli à jour : les montants peuvent être faux.</p>`
     }
+    ${duBulletin ? `<p class="small muted">Notez vos journées dans « Mes heures » pour vérifier aussi que toutes vos heures sont payées.</p>` : ""}
     <p class="small muted">Estimation, à vérifier.</p></div>`;
 }
 
