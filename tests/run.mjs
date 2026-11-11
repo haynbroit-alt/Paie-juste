@@ -698,6 +698,21 @@ console.log("=== 29. Bulletin d'agence d'intérim : colonne calendrier, page en 
   t(v.frais === 208 && v.intemperies === 73.5, "panier BTP après le net : frais 208 € ; intempéries à part");
   t(v.net === 1808 && v.netAvantImpot === 1600, "net à payer 1 808 € (et non le total employeur)");
   t(!("csg" in v) && v.hs === 87.5, "ligne CSG sur heures sup ignorée");
+  const d = r.detail;
+  t(d.length === 6, "détail : 6 lignes de gain, page en double comptée une fois");
+  const pan = d.find((x) => x.libelle.includes("Panier Jour"));
+  t(
+    !!pan && pan.montant === 56 && pan.quantite === 20 && pan.taux === 2.8 && pan.champ === "primes",
+    "détail : « Panier Jour Soumis » 20 × 2,80 € = 56 €",
+  );
+  t(
+    d.some((x) => x.libelle.includes("Trajet") && x.montant === 41.2),
+    "détail : trajet 41,20 € séparé du panier",
+  );
+  t(
+    d.some((x) => x.libelle === "Hrs normales" && x.quantite === 135),
+    "détail : libellé sans code de rubrique ni signes",
+  );
   // Page en double : rien n'est compté deux fois.
   // Vérification : IFM 10 % × 2 074,70 = 207,47 € ; ICCP 10 % × (2 074,70 + 207,47) = 228,22 €.
   const res = verifierBulletinSeul(v, { type: "interim", periode: r.periode, finContrat: r.finContrat });

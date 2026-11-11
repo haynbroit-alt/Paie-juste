@@ -7,6 +7,8 @@
 
 /** Montants au format français : 1 823,07 · 1.823,07 · 1823,07 · 12,0200 (taux). */
 const NOMBRE = /-?\d{1,3}(?:[ \u00a0.]\d{3})+,\d{2,4}|-?\d+,\d{2,4}|-?\d+\.\d{2}(?!\d)/g;
+/** Premier montant d'une ligne (sans le drapeau global de NOMBRE). */
+const NOMBRE_SEUL = new RegExp(NOMBRE.source);
 /** @param {string} s */
 const num = (s) => {
   const t = s.replace(/[ \u00a0]/g, "");
@@ -60,6 +62,8 @@ export function parseBulletin(text) {
   const sommes = {};
   /** @type {Record<string, string[]>} */
   const extraits = {};
+  /** Détail lisible des gains, ligne par ligne, dans l'ordre du bulletin. @type {{libelle: string, champ: string, montant: number, quantite: number|null, taux: number|null}[]} */
+  const detail = [];
   const vues = new Set();
   const lignes = String(text || "")
     .replace(/\r/g, "")
@@ -91,6 +95,19 @@ export function parseBulletin(text) {
     const ns = nombres(ligne);
     (sommes[k] ||= []).push(ns[ns.length - 1]);
     (extraits[k] ||= []).push(ligne.slice(0, 140));
+    const debut = ligne.search(NOMBRE_SEUL);
+    // Libellé lisible : sans le code de rubrique (« 1110 »), ni les points et signes en trop.
+    const libelle = (debut > 0 ? ligne.slice(0, debut) : ligne)
+      .replace(/^\d{3,5}\s+/, "")
+      .replace(/^[\s.°*]+|[\s:.°*-]+$/g, "")
+      .slice(0, 48);
+    detail.push({
+      libelle: libelle.charAt(0).toUpperCase() + libelle.slice(1),
+      champ: k,
+      montant: ns[ns.length - 1],
+      quantite: ns.length >= 3 ? ns[0] : null,
+      taux: ns.length >= 3 ? ns[ns.length - 2] : null,
+    });
     // Heures payées : sur la ligne du salaire de base, le premier nombre est en général le nombre d'heures.
     if (k === "base" && !("heures" in out) && ns.length >= 2 && ns[0] > 0 && ns[0] <= 260) {
       out.heures = { value: ns[0], extrait: ligne.slice(0, 140) };
@@ -111,5 +128,5 @@ export function parseBulletin(text) {
   const finContrat = ct ? isoFr(ct[2]) : null;
   // Intérim : convention « Travail temporaire », mot « intérim » ou « mission », code NAF 7820Z.
   const interim = /travail temporaire|int[ée]rim|fin de mission|\b78\.?20\s?z\b/i.test(t);
-  return { champs: out, periode, finContrat, interim };
+  return { champs: out, detail, periode, finContrat, interim };
 }
