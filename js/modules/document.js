@@ -71,7 +71,7 @@ export async function ouvrirDocuments(ctx, files, prefere) {
     return;
   }
   fermer();
-  traiterTexte(ctx, text, prefere);
+  await traiterTexte(ctx, text, prefere);
 }
 
 /** Messages de l'OCR (en anglais) → français simple. */
@@ -83,7 +83,12 @@ function traduire(s) {
 }
 
 /** @param {string} text @param {"bulletin"|"contrat"} [prefere] */
-export function traiterTexte(ctx, text, prefere) {
+export async function traiterTexte(ctx, text, prefere) {
+  // Un vrai document arrive pendant l'exemple : on ferme l'exemple, place aux vraies données.
+  if (ctx.demo) {
+    await ctx.setDemo(false);
+    ctx.toast("Exemple fermé : place à vos vrais documents.");
+  }
   let { type } = devinerDocument(text);
   if (!type) {
     const b = parseBulletin(text).champs;

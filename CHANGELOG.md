@@ -1,5 +1,16 @@
 # Journal des changements
 
+## 0.9.0 — 2026-11-12
+
+Ma paie en 3 pages courtes, l'exemple qui s'efface tout seul, et les montants corrigeables. Les règles de calcul ne changent pas.
+
+- Ma paie a 3 onglets en haut : « 📊 Résultat » (verdict, réclamation, En bref, lignes qui ne vont pas), « 📄 Ma fiche » (ajouter ou vérifier une fiche de paie, saisie à la main) et « 🔍 Détails » (net, heures par semaine, calcul, primes). Moins de défilement.
+- Dans « Ligne par ligne », seules les lignes qui posent problème sont détaillées. Les lignes justes tiennent en une ligne.
+- Le mode exemple se ferme tout seul dès qu'on met un vrai document (photo ou PDF) : la fiche est vérifiée avec vos vraies données.
+- « ✏️ Un montant est faux ? Corriger » : chaque montant lu sur la fiche est modifiable. « 🔄 Recalculer » refait la vérification, et le montant reste marqué « corrigé par vous ».
+- Mois en cours sans fiche : la prévision du net s'affiche dans Résultat.
+- Les montants ne se coupent plus sur deux lignes. Vérifié sans débordement à 390 px, avec deux polices différentes.
+
 ## 0.8.1 — 2026-11-12
 
 Des écrans rangés dans l'ordre où on les lit. Les montants de paie ne changent pas.

@@ -1196,7 +1196,7 @@ table.resume tr.tot td {
   color: var(--green);
 }
 table.resume td:first-child {
-  width: 58%;
+  width: auto;
 }
 .verdict {
   font-size: 1.35rem;
@@ -1342,4 +1342,63 @@ ul.verifs .ic {
 .btn + .card,
 .btn + details.card {
   margin-top: 0.8rem;
+}
+
+/* Ma paie : trois pages courtes */
+.sous-onglets {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  padding: 0.35rem 0;
+  margin-bottom: 0.8rem;
+  background: var(--bg);
+}
+.sous-onglets button {
+  min-height: 52px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.sous-onglets button[aria-selected="true"] {
+  border-color: var(--amber);
+  background: var(--jaune);
+}
+#bi-corriger summary {
+  list-style: none;
+}
+#bi-corriger summary::-webkit-details-marker {
+  display: none;
+}
+.sous-onglets button {
+  white-space: nowrap;
+  font-size: 0.9rem;
+  padding: 0 0.2rem;
+}
+.resume td.num,
+.calc td.r {
+  white-space: nowrap;
+}
+.corr-row {
+  display: grid;
+  grid-template-columns: 1fr 8.5rem;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.35rem 0;
+}
+.corr-row label {
+  margin: 0;
+}
+.corr-row input {
+  margin: 0;
+}
+.resume td.num {
+  width: 1%;
 }
