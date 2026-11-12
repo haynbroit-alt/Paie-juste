@@ -1,5 +1,17 @@
 # Journal des changements
 
+## 0.8.1 — 2026-11-12
+
+Des écrans rangés dans l'ordre où on les lit. Les montants de paie ne changent pas.
+
+- Ma paie : le résultat d'abord (« L'agence vous doit … » ou « Tout est en ordre »), juste dessous le bouton « ✉️ Préparer ma réclamation », puis « En bref » et le « Ligne par ligne ».
+- « Ligne par ligne » se lit sans faire glisser un tableau : une ligne par élément avec « ✅ juste » ou « il manque X € ». Les lignes à 0 € disparaissent.
+- Le détail (net, heures par semaine, calcul, saisie à la main, primes) est rangé sous « Pour vérifier en détail ». Le bloc du net est désormais bien fermé (il débordait de sa carte).
+- Une fiche qui vient d'être lue s'affiche en premier.
+- Réclamer : choix du courrier en 4 grosses cases avec le bon ordre (« 1. Demande polie », « 2. Lettre ferme »…). On demande le nom et l'adresse avant la lettre s'ils manquent. Les contacts d'aide sont repliés. Fini le gros bandeau rouge.
+- Mes heures : journée commencée sans départ, message calme (« Arrivée notée à 7 h 30. Choisissez l'heure de départ ») et bouton « Enregistrer ma journée », sans demander de motif.
+- En haut : « 🔒 Protégé » au lieu de « 108 sceaux », et le sous-titre disparaît sur petit écran. Dates du contrat en français (05/10/2026).
+
 ## 0.8.0 — 2026-11-12
 
 Un seul bouton pour tous les papiers. Les montants de paie ne changent pas.

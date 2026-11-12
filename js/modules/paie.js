@@ -98,7 +98,7 @@ function verifCard(c, periodeCourante) {
   const coller = `<details><summary class="small" style="min-height:44px;display:flex;align-items:center">ou coller le texte du bulletin</summary>
       <textarea id="bi-text" placeholder="Collez ici le texte du bulletin">${esc(bimp.raw)}</textarea><button class="btn" id="bi-parse">Vérifier ce texte</button></details>`;
   if (!F || !Object.keys(F).length) {
-    return `<div class="card" id="verif"><h2>Vérifier ma paie</h2>
+    return `<div class="card" id="verif"><h2>${c ? "Ajouter une fiche de paie" : "Vérifier ma paie"}</h2>
       ${boutonDocument("bi-file")}
       ${F ? `<p class="note bad">Je n'ai rien pu lire. Reprenez la photo bien à plat, bien éclairée.</p>` : ""}
       ${etat}${coller}</div>`;
@@ -325,9 +325,8 @@ function forecast(ctx, P, isCur) {
         x.libelle + " " + fmtEur((Number(x.montant) || 0) * (x.jours == null || x.jours === "" ? 1 : Number(x.jours))),
     )
     .join(", ");
-  return `<div class="card forecast"><h3>${isCur ? "Ce que vous allez toucher ce mois" : "Ce que vous auriez dû toucher"}</h3>
+  return `<details class="card forecast" ${isCur ? "open" : ""}><summary><h3>${isCur ? "Ce que vous allez toucher ce mois" : "Mon net, en détail"}</h3></summary>
       <div class="kpi"><div class="l">Net versé</div><div class="v num" style="color:var(--green)">${fmtEur(N.netVerse)}</div></div>
-    </div>
     <table class="calc" id="net-decompte" style="margin-top:.6rem">
       <tr><td>Net avant impôt</td><td class="r num">${fmtEur(N.netAvantImpot)}</td></tr>
       <tr><td>− Impôt à la source (${String(N.tauxPAS || 0).replace(".", ",")} %)<span class="art">taux saisi par vous · base : net imposable ${fmtEur(N.netImposable)}</span></td><td class="r num">${N.pas ? "−" : ""}${fmtEur(N.pas)}</td></tr>
@@ -347,7 +346,7 @@ function forecast(ctx, P, isCur) {
       <label class="check"><input type="checkbox" id="n-am" ${o.alsaceMoselle ? "checked" : ""}><span>Alsace-Moselle (+1,30 % maladie, taux URSSAF)</span></label>
       <label class="check"><input type="checkbox" id="n-hs" ${o.hsExoImpot ? "checked" : ""}><span>Heures sup exonérées d'impôt (limite 7 500 € par an, F2391)</span></label>
       <button class="btn" id="n-save">Enregistrer ces réglages</button></details>
-    <span class="tag warn">estimation</span></div>`;
+    <span class="tag warn">estimation</span></details>`;
 }
 
 /** État d'un bulletin gardé quand aucune heure n'est notée : la vérification du bulletin seul. */
@@ -446,17 +445,25 @@ function bulletinCard(P) {
 
 function compareCard(P) {
   if (P.cmp.verdict === "incomplet") return "";
-  return `<div class="card"><h3>Ligne par ligne</h3><div class="scroll-x"><table class="calc cmp"><tr><th>Ligne</th><th class="r">Attendu</th><th class="r">Reçu</th><th class="r">Écart</th></tr>
-    ${P.cmp.lines
-      .filter((l) => l.recu != null)
-      .map(
-        (l) =>
-          `<tr><td>${esc(l.label)}<span class="art">${l.regle === "saisie" ? "montant saisi" : "art. " + l.regle}</span></td><td class="r num">${fmtEur(l.attendu)}</td><td class="r num">${fmtEur(l.recu)}</td><td class="r num ${l.ecart > 0.004 ? "ecart-pos" : l.ecart < -0.004 ? "ecart-neg" : ""}">${l.ecart > 0 ? "+" : ""}${fmtEur(l.ecart)}</td></tr>`,
-      )
-      .join("")}
-    <tr class="tot"><td>Total</td><td></td><td></td><td class="r num ${P.cmp.total > 0 ? "ecart-pos" : ""}">${P.cmp.total > 0 ? "+" : ""}${fmtEur(P.cmp.total)}</td></tr></table></div>
+  const lignes = P.cmp.lines
+    .filter((l) => l.recu != null && (l.recu || l.attendu))
+    .map((l) => {
+      const manque = l.ecart > 0.004,
+        plus = l.ecart < -0.004;
+      const etat = manque
+        ? `<b class="ecart-pos">il manque ${fmtEur(l.ecart)}</b>`
+        : plus
+          ? `<span class="muted">+${fmtEur(-l.ecart)} en plus</span>`
+          : `<span class="ok-txt">✅ juste</span>`;
+      return `<li class="${manque ? "ko" : ""}"><div class="cmp-t"><span>${esc(l.label)}</span>${etat}</div>
+        <div class="small muted">reçu ${fmtEur(l.recu)} · attendu ${fmtEur(l.attendu)} · ${l.regle === "saisie" ? "montant saisi" : "art. " + l.regle}</div></li>`;
+    })
+    .join("");
+  const t = P.cmp.total;
+  return `<div class="card"><h3>Ligne par ligne</h3><ul class="cmp-list">${lignes}
+    <li class="tot"><div class="cmp-t"><span>Total</span>${t > 0.004 ? `<b class="ecart-pos">il manque ${fmtEur(t)}</b>` : `<b>${fmtEur(Math.abs(t))}</b>`}</div></li></ul>
     ${P.cmp.ecartHeures ? `<p class="note">Heures : ${String(Math.round(P.cmp.heuresPointees * 100) / 100).replace(".", ",")} h pointées contre ${String(P.cmp.heuresPayees).replace(".", ",")} h payées (écart ${String(P.cmp.ecartHeures).replace(".", ",")} h).</p>` : ""}
-    <p class="small muted">Écart positif = somme qui vous manque. Estimation, à vérifier. Ce n'est pas un conseil juridique.</p></div>`;
+    <p class="small muted">Estimation, à vérifier. Ce n'est pas un conseil juridique.</p></div>`;
 }
 
 export default {
@@ -475,11 +482,18 @@ export default {
     const c = P.contrat;
     const pres = prescriptionInfo(P.firstDay, parisDate(nowIso()));
     const opts = [...new Set([...months, cur])].sort().reverse();
+    // Une fiche vient d'être lue : sa vérification passe en premier.
+    const enCours = !!(bimp.champs && Object.keys(bimp.champs).length);
+    const verif = verifCard(c, periode === "contrat" ? cur : periode);
     el.innerHTML = `${contratSelect(ctx)}
       <div class="row" style="margin-bottom:.8rem"><select id="per" class="grow">${opts.map((m) => `<option value="${m}" ${m === periode ? "selected" : ""}>${fmtMois(m)}</option>`).join("")}<option value="contrat" ${periode === "contrat" ? "selected" : ""}>Toute la durée du contrat</option></select></div>
-      ${verifCard(c, periode === "contrat" ? cur : periode)}
+      ${enCours ? verif : ""}
+      ${["doit", "ordre", "trop_percu"].includes(P.cmp.verdict) ? hero(P) : ""}
+      ${P.cmp.verdict === "doit" ? `<button class="btn primary big" id="go-rec" style="margin-bottom:1rem">✉️ Préparer ma réclamation</button>` : ""}
       ${resumeCard(ctx, P, periode, periode === cur)}
-      ${P.cmp.verdict === "doit" ? hero(P) : ""}
+      ${compareCard(P)}
+      ${enCours ? "" : verif}
+      <h3 class="section-titre">Pour vérifier en détail</h3>
       ${forecast(ctx, P, periode === cur)}
       <details class="card"><summary><h3>Mes heures, semaine par semaine</h3></summary>${bars(P)}
         ${P.weeks.some((w) => w.flags.includes("tiers")) ? `<p class="note">⚠ Une semaine dépasse le tiers de votre durée de contrat (limite des heures complémentaires, L3123-20).</p>` : ""}
@@ -506,9 +520,7 @@ export default {
         }
         ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</details>
       ${bulletinCard(P)}
-      ${compareCard(P)}
-      ${primesCard(P)}
-      ${P.cmp.verdict === "doit" ? `<button class="btn primary" id="go-rec">Préparer ma réclamation →</button>` : ""}`;
+      ${primesCard(P)}`;
     bindContratSelect(ctx, el);
     animate(el.querySelector("#hero-amt"), P.cmp.verdict === "doit" ? P.cmp.total : round2(P.exp.total + P.egalite));
     el.querySelector("#per").onchange = (e) => {

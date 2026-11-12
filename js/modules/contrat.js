@@ -6,6 +6,9 @@ import { boutonDocument, brancherDocument, recevoir } from "./document.js";
 
 const ui = { editing: null, draft: null, proposals: null, rawText: "", progress: null, error: "", manuel: false };
 
+/** 2026-10-05 → 05/10/2026 */
+const dateFr = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split("-").reverse().join("/") : d || "");
+
 /** Accueil « Remplir mon contrat à la main » : le formulaire s'ouvre directement. */
 export function contratALaMain(ctx) {
   ui.manuel = true;
@@ -257,7 +260,7 @@ export default {
           <tr><td class="muted">Lieu</td><td class="r wr">${esc(c.lieu || "—")}</td></tr>
           <tr><td class="muted">Poste</td><td class="r wr">${esc(c.poste || "—")}</td></tr>
           <tr><td class="muted">Convention</td><td class="r wr">${esc(c.convention || "non précisée")}</td></tr>
-          <tr><td class="muted">Dates</td><td class="r wr">${esc(c.dateDebut || "?")} → ${esc(c.dateFin || (c.type === "cdi" ? "indéterminée" : "?"))}</td></tr>
+          <tr><td class="muted">Dates</td><td class="r wr">${esc(dateFr(c.dateDebut) || "?")} → ${esc(dateFr(c.dateFin) || (c.type === "cdi" ? "indéterminée" : "?"))}</td></tr>
           ${c.mode === "mensuel" ? `<tr><td class="muted">Taux horaire déduit</td><td class="r wr">${fmtEur(th)} <span class="art">mensuel ÷ (${c.hebdo} × 52/12)</span></td></tr>` : ""}
           ${c.avantages.length ? `<tr><td class="muted">Primes fixes</td><td class="r wr">${c.avantages.map((a) => esc(a.libelle) + " " + fmtEur(a.montant)).join("<br>")}</td></tr>` : ""}
           ${c.fin ? `<tr><td class="muted">Fin</td><td class="r wr">${fmtParis(c.fin.at, { year: true })} · ${esc(MOTIFS_FIN[c.fin.motif]?.label || "")}</td></tr>` : ""}
