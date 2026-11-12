@@ -55,6 +55,14 @@ export function buildContext(ctx) {
   };
 }
 
+/** @param {{nom?: string, adresse?: string, ville?: string}} p */
+function profilChamps(p) {
+  return `<label for="pf-nom">Nom et prénom</label><input id="pf-nom" type="text" value="${esc(p.nom || "")}">
+    <label for="pf-adr">Adresse</label><input id="pf-adr" type="text" value="${esc(p.adresse || "")}">
+    <label for="pf-ville">Ville (pour « Fait à »)</label><input id="pf-ville" type="text" value="${esc(p.ville || "")}" placeholder="Montpellier">
+    <button class="btn" id="pf-save">Enregistrer</button>`;
+}
+
 export default {
   id: "reclamer",
   label: "Réclamer",
@@ -74,33 +82,34 @@ export default {
             : annexeReleve(L);
     const p = L.profil;
     el.innerHTML = `${contratSelect(ctx)}
-      <div class="note bad"><b>Ce n'est pas un conseil juridique.</b> L'appli prépare des brouillons. Rien n'est envoyé automatiquement : vous relisez, vous signez, vous envoyez vous-même.</div>
-      <div class="card"><div class="row"><div class="grow"><h3>Montant réclamé (${esc(L.periodeLabel)})</h3><p class="muted small">Calculé dans « Ma paie » · estimation, à vérifier</p></div>
+      <div class="card"><div class="row"><div class="grow"><h3>À réclamer · ${esc(L.periodeLabel)}</h3><p class="muted small">Calculé dans « Ma paie » · estimation, à vérifier</p></div>
         <div class="num" style="font-size:2rem;font-weight:950;color:${L.compare.total > 0 ? "var(--red)" : "var(--green)"}">${fmtEur(Math.max(0, L.compare.total))}</div></div>
         ${L.compare.verdict === "incomplet" ? `<p class="note">Saisissez d'abord votre bulletin dans « Ma paie » pour chiffrer l'écart.</p>` : ""}</div>
-      <div class="seg-ctl" role="group" aria-label="Type de courrier">
-        <button data-t="amiable" aria-pressed="${ui.type === "amiable"}">① Demande amiable</button>
-        <button data-t="med" aria-pressed="${ui.type === "med"}">② Mise en demeure</button>
-        <button data-t="annexe" aria-pressed="${ui.type === "annexe"}">③ Relevé scellé</button>
-        <button data-t="rgpd" aria-pressed="${ui.type === "rgpd"}">④ Mes données (RGPD)</button></div>
+      <h3 class="section-titre">Quel courrier ?</h3>
+      <div class="choix-courrier" role="group" aria-label="Type de courrier">
+        <button data-t="amiable" aria-pressed="${ui.type === "amiable"}"><b>1. Demande polie</b><span>À envoyer en premier</span></button>
+        <button data-t="med" aria-pressed="${ui.type === "med"}"><b>2. Lettre ferme</b><span>Mise en demeure, si pas de réponse après 15 jours</span></button>
+        <button data-t="annexe" aria-pressed="${ui.type === "annexe"}"><b>Mon relevé d'heures</b><span>Preuve à joindre (scellée)</span></button>
+        <button data-t="rgpd" aria-pressed="${ui.type === "rgpd"}"><b>Demander mes données</b><span>Mes relevés chez l'employeur (RGPD)</span></button></div>
+      ${
+        p.nom
+          ? ""
+          : `<div class="card" id="pf-card"><h3>Votre nom et adresse</h3><p class="small muted">Ils apparaissent en haut de la lettre. Enregistrés sur ce téléphone seulement.</p>${profilChamps(p)}</div>`
+      }
       ${ui.type === "rgpd" ? `<p class="note">Pour obtenir de l'employeur ou de l'agence les relevés d'heures et éléments de paie qu'ils ont sur vous. Ce courrier ne réclame aucun montant : vous pouvez l'envoyer même sans écart chiffré.</p>` : ""}
       ${ui.type === "med" ? `<div class="grid2"><div><label for="r-am">Date de la demande amiable</label><input id="r-am" type="date" value="${ui.amiableDate}"></div><div><label for="r-del">Délai (jours)</label><input id="r-del" type="number" value="${ui.delai}"></div></div>` : ""}
       <div class="paper" id="paper" style="margin-top:.8rem">${esc(txt)}</div>
       <div class="grid2"><button class="btn primary" id="r-copy">Copier</button><button class="btn" id="r-print">Imprimer / PDF</button></div>
-      <p class="small muted">« Imprimer / PDF » ouvre la boîte d'impression du téléphone : choisissez « Enregistrer au format PDF ». Le relevé scellé est ajouté en annexe, sur une nouvelle page.</p>
-      <details class="card"><summary style="min-height:48px;display:flex;align-items:center"><b>Mes coordonnées pour les courriers</b></summary>
-        <label for="pf-nom">Nom et prénom</label><input id="pf-nom" type="text" value="${esc(p.nom || "")}">
-        <label for="pf-adr">Adresse</label><input id="pf-adr" type="text" value="${esc(p.adresse || "")}">
-        <label for="pf-ville">Ville (pour « Fait à »)</label><input id="pf-ville" type="text" value="${esc(p.ville || "")}" placeholder="Montpellier">
-        <button class="btn" id="pf-save">Enregistrer sur ce téléphone</button></details>
-      <div class="card"><h3>Se faire aider (gratuit)</h3><p class="small muted">Pour tout salarié : CDI, CDD, intérim, temps partiel. Coordonnées vérifiées le 10/11/2026 sur les sites officiels.</p>
+      <p class="small muted">Brouillon à relire et signer : rien n'est envoyé tout seul. Ce n'est pas un conseil juridique. « Imprimer / PDF » : choisissez « Enregistrer au format PDF » ; le relevé d'heures est ajouté en annexe.</p>
+      ${p.nom ? `<details class="card"><summary><h3>Mes coordonnées</h3></summary>${profilChamps(p)}</details>` : ""}
+      <details class="card"><summary><h3>📞 Se faire aider (gratuit)</h3></summary><p class="small muted">Pour tout salarié : CDI, CDD, intérim, temps partiel. Coordonnées vérifiées le 10/11/2026 sur les sites officiels.</p>
         ${CONTACTS.map(
           (
             c,
           ) => `<div class="contact"><b>${esc(c.nom)}</b><div class="small muted">${esc(c.role)}</div>${c.lignes.map((l) => `<div class="small">${esc(l)}</div>`).join("")}${c.telAff ? `<div class="small">${esc(c.telAff)}</div>` : ""}
           <div class="actions">${c.tel ? `<a href="tel:${c.tel}">📞 Appeler</a>` : ""}${c.mail ? `<a href="mailto:${c.mail}">✉ ${esc(c.mail)}</a>` : ""}${c.lien ? `<a href="${c.lien}" target="_blank" rel="noopener">Ouvrir</a>` : ""}<a href="${c.source}" target="_blank" rel="noopener" class="dim">source</a></div></div>`,
         ).join("")}
-        <p class="small dim">${esc(CONTACTS_NOTE)}</p></div>`;
+        <p class="small dim">${esc(CONTACTS_NOTE)}</p></details>`;
     bindContratSelect(ctx, el);
     el.querySelectorAll("[data-t]").forEach(
       (b) =>

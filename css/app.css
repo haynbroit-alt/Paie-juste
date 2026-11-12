@@ -1260,3 +1260,86 @@ ul.verifs .ic {
 #doc-lecture .doc-box h2 {
   margin-top: 0;
 }
+
+/* Ma paie : ligne par ligne lisible sans défilement horizontal */
+.cmp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cmp-list li {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.cmp-list li.ko .cmp-t span:first-child {
+  font-weight: 700;
+}
+.cmp-list li.tot {
+  border-bottom: 0;
+  font-weight: 800;
+}
+.cmp-t {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.2rem 0.6rem;
+  align-items: baseline;
+}
+.cmp-t > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cmp-t > :last-child {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+.ok-txt {
+  color: var(--green);
+  font-weight: 700;
+}
+.section-titre {
+  margin: 1.4rem 0.2rem 0.6rem;
+  color: var(--muted);
+  font-size: 1rem;
+}
+@media (max-width: 440px) {
+  .brand span {
+    display: none;
+  }
+}
+.choix-courrier {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+.choix-courrier button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-height: 72px;
+  padding: 0.7rem;
+  text-align: left;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.choix-courrier button span {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.choix-courrier button[aria-pressed="true"] {
+  border-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.btn + .card,
+.btn + details.card {
+  margin-top: 0.8rem;
+}

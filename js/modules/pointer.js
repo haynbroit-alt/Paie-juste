@@ -87,12 +87,14 @@ function journeeCard(ctx, today, jour, existant) {
       <div class="total-jour"><span>Total travaillé</span><b class="num" id="j-total">—</b></div>
       ${
         modif
-          ? `${existant.aVerifier ? `<p class="note bad">Départ manquant : complétez la journée.</p>` : ""}
-      <label for="j-motif">Pourquoi ce changement ?</label><input id="j-motif" type="text" value="${existant.aVerifier ? "Journée complétée" : ""}" placeholder="Ex. : parti à 17 h">`
+          ? existant.aVerifier
+            ? `<p class="note">Arrivée notée à ${esc(String(v.debut).replace(":", " h "))}. Choisissez l'heure de départ, puis enregistrez.</p>
+      <input id="j-motif" type="hidden" value="Journée complétée">`
+            : `<label for="j-motif">Pourquoi ce changement ?</label><input id="j-motif" type="text" value="" placeholder="Ex. : parti à 17 h">`
           : ""
       }
       <p class="note bad" id="j-err" hidden></p>
-      <button class="btn primary big" id="j-ok">${modif ? "ENREGISTRER LA MODIFICATION" : "ENREGISTRER MA JOURNÉE"}</button>
+      <button class="btn primary big" id="j-ok">${modif && !existant.aVerifier ? "ENREGISTRER LA MODIFICATION" : "ENREGISTRER MA JOURNÉE"}</button>
       ${modif ? `<button class="btn ghost" id="j-suppr">Supprimer cette journée</button>` : ""}
       ${vite ? "</details>" : ""}
     </div>`;

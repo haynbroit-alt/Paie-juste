@@ -118,9 +118,10 @@ function renderPill() {
   const p = $("#seal-pill");
   if (!ctx.verif) return;
   p.className = "seal-pill" + (ctx.verif.ok ? "" : " bad");
-  p.textContent = ctx.verif.ok
-    ? `✓ ${ctx.records.length} sceau${ctx.records.length > 1 ? "x" : ""}`
-    : "⚠ chaîne rompue";
+  p.title = ctx.verif.ok
+    ? `${ctx.records.length} enregistrement${ctx.records.length > 1 ? "s" : ""} scellé${ctx.records.length > 1 ? "s" : ""} : rien n'a été effacé ni modifié en cachette.`
+    : "Un enregistrement a été modifié : la chaîne d'empreintes est rompue.";
+  p.textContent = ctx.verif.ok ? "🔒 Protégé" : "⚠ chaîne rompue";
 }
 let current = null;
 function render() {

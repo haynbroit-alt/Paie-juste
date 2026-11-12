@@ -102,7 +102,7 @@ console.log("=== Parcours réel (base vide) ===");
   await p.$eval("#historique", (d) => (d.open = true));
   const hist = await txt(p, "#historique");
   t(hist.includes("modifiée") && hist.includes("parti à 17 h"), "historique : journée « modifiée » avec le motif");
-  t((await txt(p, "#seal-pill")).includes("✓"), "chaîne intacte : " + (await txt(p, "#seal-pill")));
+  t((await txt(p, "#seal-pill")).includes("Protégé"), "chaîne intacte : " + (await txt(p, "#seal-pill")));
   const v = await types();
   t(
     v === "genesis,contrat,punch,punch,punch,punch,correction,correction,correction,correction,punch,punch,punch,punch",
@@ -148,6 +148,8 @@ for (const [tab, file] of [
     await wait(300);
     await p.screenshot({ path: `${OUT}/2c-ma-paie-net-verse.png` });
   }
+  // Blocs repliés ouverts pour lire tout le texte (le contenu existe, il est seulement replié).
+  await p.$$eval("details", (ds) => ds.forEach((d) => (d.open = true)));
   shots[tab] = await txt(p, "main");
   await p.close();
 }
@@ -505,7 +507,7 @@ console.log("=== Sauvegarde chiffrée : créer, effacer, restaurer ===");
   await wait(3000);
   const apres = await p.evaluate(async () => (await window.__pj.store.all()).length);
   t(apres === avant, `restauration : ${apres} enregistrements sur ${avant}`);
-  t((await txt(p, "#seal-pill")).includes("✓"), "chaîne intacte après restauration");
+  t((await txt(p, "#seal-pill")).includes("Protégé"), "chaîne intacte après restauration");
   await p.reload({ waitUntil: "networkidle0" });
   await p.evaluate(() => window.__pj.go("pointer"));
   await wait(400);
