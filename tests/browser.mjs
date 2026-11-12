@@ -144,12 +144,15 @@ for (const [tab, file] of [
   t(sw <= 390, `${tab} : pas de débordement horizontal à 390 px (scrollWidth ${sw})`);
   await p.screenshot({ path: `${OUT}/${file}-page-entiere.png`, fullPage: true });
   if (tab === "paie") {
+    await click(p, '[data-p="details"]');
+    await p.$eval(".forecast", (d) => (d.open = true));
     await p.evaluate(() => document.querySelector("#net-decompte").scrollIntoView({ block: "center" }));
     await wait(300);
     await p.screenshot({ path: `${OUT}/2c-ma-paie-net-verse.png` });
   }
   // Blocs repliés ouverts pour lire tout le texte (le contenu existe, il est seulement replié).
   await p.$$eval("details", (ds) => ds.forEach((d) => (d.open = true)));
+  await p.$$eval("[data-panel]", (ss) => ss.forEach((x) => (x.hidden = false)));
   shots[tab] = await txt(p, "main");
   await p.close();
 }
@@ -325,6 +328,8 @@ console.log("=== Photo du bulletin de paie (OCR local) ===");
   const p = await newPage();
   await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
   await wait(600);
+  t(!!(await p.$('.sous-onglets [data-p="resultat"]')), "Ma paie : 3 pages (Résultat, Ma fiche, Détails)");
+  await click(p, '[data-p="fiche"]');
   const input = await p.$("#bi-file");
   t(
     !!input && (await txt(p, "#verif")).includes("Ajouter ma fiche de paie ou mon contrat"),
@@ -411,6 +416,57 @@ console.log("=== Un seul bouton à l'accueil : l'appli reconnaît le document ==
   );
   await wait(500);
   await p.screenshot({ path: `${OUT}/0-accueil-contrat-reconnu.png` });
+  await p.close();
+}
+
+console.log("=== Exemple fermé tout seul, montant corrigé à la main ===");
+{
+  const p = await newPage();
+  await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(600);
+  t(await p.$eval("body", (b) => b.classList.contains("demo")), "avant : mode exemple");
+  await click(p, '[data-p="fiche"]');
+  await (await p.$("#bi-file")).uploadFile(FIX + "/bulletin-cases.pdf");
+  await p.waitForSelector("#touche", { timeout: 30000 }).catch(() => {});
+  await wait(400);
+  t(!(await p.$eval("body", (b) => b.classList.contains("demo"))), "vrai fichier : l'exemple se ferme tout seul");
+  t(!(await p.evaluate(() => window.__pj.demo)), "vraies données utilisées, pas l'exemple");
+  const avant = await txt(p, "#touche");
+  await p.$eval("#bi-corriger", (d) => (d.open = true));
+  const champ = await p.$("#bc-brut");
+  t(!!champ, "« Corriger » : chaque montant lu est modifiable");
+  await p.$eval("#bc-brut", (i) => (i.value = "9999"));
+  await click(p, "#bi-recalc");
+  await wait(400);
+  const apres = await txt(p, "#verif");
+  t(apres.includes("9 999,00") && avant !== apres, "montant corrigé : la vérification est refaite");
+  await p.close();
+}
+
+console.log("=== Sortir de l'exemple, supprimer une fiche de paie ===");
+{
+  const p = await newPage();
+  p.on("dialog", (d) => d.accept("Mauvaise fiche"));
+  await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(600);
+  t((await txt(p, "main")).includes("vous doit"), "exemple : une fiche de paie fictive gardée");
+  await click(p, '[data-p="fiche"]');
+  t(!!(await p.$("#b-suppr")), "Ma fiche : bouton « Supprimer cette fiche de paie »");
+  await click(p, "#b-suppr");
+  await wait(800);
+  await click(p, '[data-p="resultat"]');
+  const m = await txt(p, "main");
+  t(!m.includes("vous doit") && !(await p.$("#b-suppr")), "fiche supprimée : plus de « vous doit »");
+  const hist = await p.evaluate(
+    async () => (await window.__pj.store.all()).filter((r) => r.type === "correction").length,
+  );
+  t(hist >= 1, "suppression tracée (correction scellée, rien d'effacé)");
+  const btn = await p.$("#quit-demo");
+  t(!!btn && !!(await btn.boundingBox()), "bandeau exemple : bouton « Quitter l'exemple » visible");
+  await click(p, "#quit-demo");
+  await wait(800);
+  t(!(await p.$eval("body", (b) => b.classList.contains("demo"))), "un geste : exemple quitté");
+  t(!(await (await p.$("#quit-demo")).boundingBox()), "hors exemple : le bouton disparaît");
   await p.close();
 }
 

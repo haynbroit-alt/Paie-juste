@@ -16,7 +16,18 @@ import { contratSelect, bindContratSelect } from "./pointer.js";
 import { parseBulletin } from "../bulletin-parse.js";
 import { boutonDocument, brancherDocument, recevoir } from "./document.js";
 
-const ui = { periode: null, avecFin: null };
+const ui = { periode: null, avecFin: null, panneau: null };
+
+/** @param {string} actif */
+function sousOnglets(actif) {
+  return `<div class="sous-onglets" role="tablist" aria-label="Ma paie">${[
+    ["resultat", "📊 Résultat"],
+    ["fiche", "📄 Ma fiche"],
+    ["details", "🔍 Détails"],
+  ]
+    .map(([k, l]) => `<button role="tab" data-p="${k}" aria-selected="${k === actif}">${l}</button>`)
+    .join("")}</div>`;
+}
 /** Lecture d'un bulletin (photo ou PDF) : état de l'écran, rien n'est enregistré ici. */
 const bimp = {
   progress: null,
@@ -47,6 +58,8 @@ const NOMS_CHAMPS = {
 recevoir("bulletin", (ctx, text) => {
   Object.assign(bimp, { error: "", progress: null });
   analyserBulletin(text);
+  ui.panneau = "fiche";
+  if (bimp.periode) ui.periode = bimp.periode;
   ctx.go("paie");
   window.scrollTo(0, 0);
 });
@@ -89,7 +102,6 @@ function typeDevine(c) {
   if (!f) return "cdi";
   return /mission|ifm/i.test(f.extrait) ? "interim" : "cdd";
 }
-const fmtHeures = (h) => String(h).replace(".", ",") + " h";
 
 function verifCard(c, periodeCourante) {
   const F = bimp.champs;
@@ -146,13 +158,16 @@ function verifCard(c, periodeCourante) {
     ${verdict}
     <ul class="verifs">${items.join("") || item(null, "Rien à contrôler sur ce bulletin.")}</ul>
     ${toucheTable(valeursLues(), bimp.detail, v, "touche")}
-    <details><summary class="small" style="min-height:44px;display:flex;align-items:center">Ce que j'ai lu</summary>
-      <ul class="verifs">${Object.entries(F)
+    <details id="bi-corriger"><summary class="btn" style="margin-top:.6rem">✏️ Un montant est faux ? Corriger</summary>
+      <p class="small muted">Corrigez le chiffre comme il est écrit sur votre fiche, puis appuyez sur « Recalculer ».</p>
+      ${Object.entries(F)
         .map(
           ([k, f]) =>
-            `<li><span>${esc(NOMS_CHAMPS[k] || k)} : <b>${k === "heures" ? fmtHeures(f.value) : fmtEur(f.value)}</b><div class="ex">« ${esc(f.extrait)} »</div></span></li>`,
+            `<div class="corr-row"><label for="bc-${k}">${esc(NOMS_CHAMPS[k] || k)}${k === "heures" ? " (h)" : " (€)"}</label>
+            <input id="bc-${k}" data-champ="${k}" type="number" inputmode="decimal" step="0.01" value="${f.value}"></div>`,
         )
-        .join("")}</ul></details>
+        .join("")}
+      <button class="btn primary" id="bi-recalc">🔄 Recalculer</button></details>
     <button class="btn primary big" id="bi-garder">✅ Garder ce bulletin</button>
     <label class="btn" for="bi-file" style="cursor:pointer">📷 Reprendre la photo</label><input id="bi-file" type="file" accept="image/*,application/pdf" multiple hidden>
     ${etat}
@@ -204,6 +219,25 @@ function bindVerif(ctx, el, c, periodeCourante) {
       ctx.go("paie");
     };
   }
+  const rc = el.querySelector("#bi-recalc");
+  if (rc) {
+    rc.onclick = () => {
+      let n = 0;
+      el.querySelectorAll("[data-champ]").forEach((i) => {
+        const inp = /** @type {HTMLInputElement} */ (i);
+        const k = inp.dataset.champ;
+        const v = Number(String(inp.value).replace(",", "."));
+        if (k && bimp.champs[k] && inp.value !== "" && Number.isFinite(v) && v !== bimp.champs[k].value) {
+          bimp.champs[k] = { value: v, extrait: "corrigé par vous (lu : " + bimp.champs[k].value + ")" };
+          n++;
+        }
+      });
+      ctx.toast(
+        n ? `${n} montant${n > 1 ? "s" : ""} corrigé${n > 1 ? "s" : ""} : vérification refaite.` : "Rien n'a changé.",
+      );
+      ctx.go("paie");
+    };
+  }
   const g = el.querySelector("#bi-garder");
   if (g) {
     g.onclick = async () => {
@@ -231,6 +265,7 @@ function bindVerif(ctx, el, c, periodeCourante) {
       await ctx.append("bulletin", data);
       Object.assign(bimp, { champs: null, detail: [], raw: "", periode: null, finContrat: null });
       ui.periode = periode;
+      ui.panneau = "resultat";
       ctx.toast(c ? "Bulletin gardé." : "Bulletin gardé. Contrat créé : complétez-le dans « Contrat ».");
       await ctx.refresh();
     };
@@ -445,8 +480,11 @@ function bulletinCard(P) {
 
 function compareCard(P) {
   if (P.cmp.verdict === "incomplet") return "";
-  const lignes = P.cmp.lines
-    .filter((l) => l.recu != null && (l.recu || l.attendu))
+  const vues = P.cmp.lines.filter((l) => l.recu != null && (l.recu || l.attendu));
+  // Les lignes justes tiennent en une seule ligne : on ne détaille que ce qui ne va pas.
+  const justes = vues.filter((l) => Math.abs(l.ecart) <= 0.004);
+  const lignes = vues
+    .filter((l) => Math.abs(l.ecart) > 0.004)
     .map((l) => {
       const manque = l.ecart > 0.004,
         plus = l.ecart < -0.004;
@@ -460,7 +498,10 @@ function compareCard(P) {
     })
     .join("");
   const t = P.cmp.total;
-  return `<div class="card"><h3>Ligne par ligne</h3><ul class="cmp-list">${lignes}
+  const ok = justes.length
+    ? `<li><div class="cmp-t"><span>${justes.map((l) => esc(l.label)).join(", ")}</span><span class="ok-txt">✅ juste</span></div></li>`
+    : "";
+  return `<div class="card"><h3>Ligne par ligne</h3><ul class="cmp-list">${lignes}${ok}
     <li class="tot"><div class="cmp-t"><span>Total</span>${t > 0.004 ? `<b class="ecart-pos">il manque ${fmtEur(t)}</b>` : `<b>${fmtEur(Math.abs(t))}</b>`}</div></li></ul>
     ${P.cmp.ecartHeures ? `<p class="note">Heures : ${String(Math.round(P.cmp.heuresPointees * 100) / 100).replace(".", ",")} h pointées contre ${String(P.cmp.heuresPayees).replace(".", ",")} h payées (écart ${String(P.cmp.ecartHeures).replace(".", ",")} h).</p>` : ""}
     <p class="small muted">Estimation, à vérifier. Ce n'est pas un conseil juridique.</p></div>`;
@@ -485,16 +526,34 @@ export default {
     // Une fiche vient d'être lue : sa vérification passe en premier.
     const enCours = !!(bimp.champs && Object.keys(bimp.champs).length);
     const verif = verifCard(c, periode === "contrat" ? cur : periode);
+    // Trois pages courtes au lieu d'une longue : Résultat, Ma fiche, Détails.
+    const panneau = enCours ? "fiche" : ui.panneau || "resultat";
+    // Mois en cours sans bulletin : la prévision du net EST le résultat.
+    const prevision = periode === cur && P.cmp.verdict === "incomplet";
     el.innerHTML = `${contratSelect(ctx)}
       <div class="row" style="margin-bottom:.8rem"><select id="per" class="grow">${opts.map((m) => `<option value="${m}" ${m === periode ? "selected" : ""}>${fmtMois(m)}</option>`).join("")}<option value="contrat" ${periode === "contrat" ? "selected" : ""}>Toute la durée du contrat</option></select></div>
-      ${enCours ? verif : ""}
+      ${sousOnglets(panneau)}
+      <section data-panel="resultat" ${panneau === "resultat" ? "" : "hidden"}>
       ${["doit", "ordre", "trop_percu"].includes(P.cmp.verdict) ? hero(P) : ""}
       ${P.cmp.verdict === "doit" ? `<button class="btn primary big" id="go-rec" style="margin-bottom:1rem">✉️ Préparer ma réclamation</button>` : ""}
       ${resumeCard(ctx, P, periode, periode === cur)}
+      ${P.cmp.verdict === "incomplet" ? `<button class="btn" data-p="fiche">📄 Vérifier avec ma fiche de paie</button>` : ""}
       ${compareCard(P)}
-      ${enCours ? "" : verif}
-      <h3 class="section-titre">Pour vérifier en détail</h3>
-      ${forecast(ctx, P, periode === cur)}
+      ${prevision ? forecast(ctx, P, true) : ""}
+      </section>
+      <section data-panel="fiche" ${panneau === "fiche" ? "" : "hidden"}>
+      ${verif}
+      ${
+        P.bulletin && P.bulletin.id
+          ? `<div class="card" id="b-garde"><h3>Fiche de paie gardée · ${esc(fmtMois(periode === "contrat" ? cur : periode))}</h3>
+        <p class="small muted">Ce n'est pas la bonne ? Supprimez-la. Elle reste tracée dans l'historique (rien ne s'efface en cachette).</p>
+        <button class="btn" id="b-suppr">🗑️ Supprimer cette fiche de paie</button></div>`
+          : ""
+      }
+      ${bulletinCard(P)}
+      </section>
+      <section data-panel="details" ${panneau === "details" ? "" : "hidden"}>
+      ${prevision ? "" : forecast(ctx, P, periode === cur)}
       <details class="card"><summary><h3>Mes heures, semaine par semaine</h3></summary>${bars(P)}
         ${P.weeks.some((w) => w.flags.includes("tiers")) ? `<p class="note">⚠ Une semaine dépasse le tiers de votre durée de contrat (limite des heures complémentaires, L3123-20).</p>` : ""}
         ${P.weeks.some((w) => w.flags.includes("legale")) ? `<p class="note">⚠ Une semaine atteint 35 h alors que vous êtes à temps partiel (L3123-9).</p>` : ""}</details>
@@ -519,8 +578,20 @@ export default {
             : ""
         }
         ${pres && pres.horsDelai ? `<p class="note bad">Une partie de cette période a plus de 3 ans : délai de prescription des salaires (L3245-1) peut-être dépassé.</p>` : ""}</details>
-      ${bulletinCard(P)}
-      ${primesCard(P)}`;
+      ${primesCard(P)}
+      </section>`;
+    el.querySelectorAll("[data-p]").forEach((b) => {
+      /** @type {HTMLElement} */ (b).onclick = () => {
+        ui.panneau = /** @type {HTMLElement} */ (b).dataset.p;
+        el.querySelectorAll("[data-panel]").forEach((x) => {
+          /** @type {HTMLElement} */ (x).hidden = /** @type {HTMLElement} */ (x).dataset.panel !== ui.panneau;
+        });
+        el.querySelectorAll(".sous-onglets [data-p]").forEach((x) =>
+          x.setAttribute("aria-selected", String(/** @type {HTMLElement} */ (x).dataset.p === ui.panneau)),
+        );
+        window.scrollTo(0, 0);
+      };
+    });
     bindContratSelect(ctx, el);
     animate(el.querySelector("#hero-amt"), P.cmp.verdict === "doit" ? P.cmp.total : round2(P.exp.total + P.egalite));
     el.querySelector("#per").onchange = (e) => {
@@ -550,6 +621,21 @@ export default {
       ctx.go("paie");
     };
     bindVerif(ctx, el, c, periode === "contrat" ? cur : periode);
+    const bs = el.querySelector("#b-suppr");
+    if (bs) {
+      bs.onclick = async () => {
+        const motif = prompt("Pourquoi supprimer cette fiche ? (gardé dans l'historique)", "Mauvaise fiche de paie");
+        if (motif === null) return;
+        await ctx.append("correction", {
+          targetId: P.bulletin.id,
+          annule: true,
+          motif: motif.trim() || "Fiche supprimée",
+        });
+        ui.panneau = "fiche";
+        ctx.toast("Fiche de paie supprimée. Vous pouvez en ajouter une autre.");
+        ctx.refresh();
+      };
+    }
     el.querySelector("#b-save").onclick = async () => {
       const data = { contratId: c.id, periode };
       el.querySelectorAll('[id^="b-"]').forEach((i) => {
