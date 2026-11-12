@@ -14,6 +14,7 @@ import { computePeriod, contratRows, periodsOf, previsionMois, prescriptionInfo 
 import { esc, fmtMois, fmtJour, nowIso } from "../util.js";
 import { contratSelect, bindContratSelect } from "./pointer.js";
 import { parseBulletin } from "../bulletin-parse.js";
+import { boutonDocument, brancherDocument, recevoir } from "./document.js";
 
 const ui = { periode: null, avecFin: null };
 /** Lecture d'un bulletin (photo ou PDF) : état de l'écran, rien n'est enregistré ici. */
@@ -43,37 +44,13 @@ const NOMS_CHAMPS = {
   net: "Net à payer (pour vérifier)",
 };
 
-async function lireBulletin(ctx, file) {
-  Object.assign(bimp, {
-    error: "",
-    champs: null,
-    detail: [],
-    periode: null,
-    progress: { status: "Préparation", progress: 0 },
-  });
+recevoir("bulletin", (ctx, text) => {
+  Object.assign(bimp, { error: "", progress: null });
+  analyserBulletin(text);
   ctx.go("paie");
-  const prog = (m) => {
-    bimp.progress = m;
-    const bar = document.querySelector("#bi-bar");
-    const st = document.querySelector("#bi-st");
-    if (bar) bar.style.width = Math.round((m.progress || 0) * 100) + "%";
-    if (st) st.textContent = m.status || "";
-  };
-  try {
-    const { pdfToText, pdfPageToBlob, imageToText } = await import("../importer.js");
-    let text = "";
-    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-      const r = await pdfToText(file, prog);
-      text = r.text;
-      if (text.replace(/\s/g, "").length < 40) text = (await imageToText(await pdfPageToBlob(r.doc, 1), prog)).text;
-    } else text = (await imageToText(file, prog)).text;
-    analyserBulletin(text);
-  } catch (e) {
-    bimp.error = "Lecture impossible : " + (e.message || e) + ". Vous pouvez recopier les montants à la main.";
-  }
-  bimp.progress = null;
-  ctx.go("paie");
-}
+  window.scrollTo(0, 0);
+});
+
 function analyserBulletin(text) {
   bimp.raw = text;
   const r = parseBulletin(text);
@@ -116,14 +93,13 @@ const fmtHeures = (h) => String(h).replace(".", ",") + " h";
 
 function verifCard(c, periodeCourante) {
   const F = bimp.champs;
-  const prise = `<input id="bi-file" type="file" accept="application/pdf,image/*" hidden>`;
   const etat = `${bimp.progress ? `<p id="bi-st" class="small">${esc(bimp.progress.status || "Lecture…")}</p><div class="progress"><i id="bi-bar"></i></div>` : ""}
     ${bimp.error ? `<p class="note bad">${esc(bimp.error)}</p>` : ""}`;
   const coller = `<details><summary class="small" style="min-height:44px;display:flex;align-items:center">ou coller le texte du bulletin</summary>
       <textarea id="bi-text" placeholder="Collez ici le texte du bulletin">${esc(bimp.raw)}</textarea><button class="btn" id="bi-parse">Vérifier ce texte</button></details>`;
   if (!F || !Object.keys(F).length) {
-    return `<div class="card" id="verif"><h2>Ma fiche de paie</h2>
-      <label class="btn primary big" for="bi-file" style="cursor:pointer">📷 Vérifier ma fiche de paie</label>${prise}
+    return `<div class="card" id="verif"><h2>Vérifier ma paie</h2>
+      ${boutonDocument("bi-file")}
       ${F ? `<p class="note bad">Je n'ai rien pu lire. Reprenez la photo bien à plat, bien éclairée.</p>` : ""}
       ${etat}${coller}</div>`;
   }
@@ -178,7 +154,7 @@ function verifCard(c, periodeCourante) {
         )
         .join("")}</ul></details>
     <button class="btn primary big" id="bi-garder">✅ Garder ce bulletin</button>
-    <label class="btn" for="bi-file" style="cursor:pointer">📷 Reprendre la photo</label>${prise}
+    <label class="btn" for="bi-file" style="cursor:pointer">📷 Reprendre la photo</label><input id="bi-file" type="file" accept="image/*,application/pdf" multiple hidden>
     ${etat}
     <p class="small muted">Estimation, à vérifier. Ce n'est pas un conseil juridique.</p></div>`;
 }
@@ -220,13 +196,7 @@ function toucheTable(F, detail, v, id) {
 }
 
 function bindVerif(ctx, el, c, periodeCourante) {
-  const f = el.querySelector("#bi-file");
-  if (f) {
-    f.onchange = (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (file) lireBulletin(ctx, file);
-    };
-  }
+  brancherDocument(ctx, el, "bi-file", "bulletin");
   const p = el.querySelector("#bi-parse");
   if (p) {
     p.onclick = () => {

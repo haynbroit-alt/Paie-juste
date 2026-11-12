@@ -325,8 +325,8 @@ console.log("=== Photo du bulletin de paie (OCR local) ===");
   await wait(600);
   const input = await p.$("#bi-file");
   t(
-    !!input && (await txt(p, "#verif")).includes("Vérifier ma fiche de paie"),
-    "Ma paie : gros bouton « Vérifier ma fiche de paie »",
+    !!input && (await txt(p, "#verif")).includes("Ajouter ma fiche de paie ou mon contrat"),
+    "Ma paie : un seul gros bouton « Ajouter ma fiche de paie ou mon contrat »",
   );
   const t0 = Date.now();
   await input.uploadFile(FIX + "/bulletin-photo.png");
@@ -378,6 +378,37 @@ console.log("=== Fiche de paie en PDF de logiciel de paie (cases dans le désord
     "« Ce que j'ai touché » : détail ligne par ligne",
   );
   if (!res.includes("213,35")) console.log(res.slice(0, 1200));
+  await p.close();
+}
+
+console.log("=== Un seul bouton à l'accueil : l'appli reconnaît le document ===");
+{
+  const p = await newPage();
+  await p.goto(BASE + "?nosw", { waitUntil: "networkidle0" });
+  await wait(400);
+  t(!!(await p.$("#w-file")), "accueil : gros bouton « Ajouter ma fiche de paie ou mon contrat »");
+  t(
+    (await p.$eval("#w-file", (i) => i.multiple && i.accept.includes("pdf"))) === true,
+    "photo ou PDF, plusieurs pages",
+  );
+  await (await p.$("#w-file")).uploadFile(FIX + "/bulletin-cases.pdf");
+  await p.waitForSelector("#touche", { timeout: 30000 }).catch(() => {});
+  t(
+    !!(await p.$("#touche")) && !(await p.$("#doc-lecture")),
+    "fiche de paie reconnue : vérification affichée dans Ma paie",
+  );
+  await p.goto(BASE + "?nosw", { waitUntil: "networkidle0" });
+  await wait(400);
+  await (await p.$("#w-file")).uploadFile(FIX + "/contrat-texte.pdf");
+  await p.waitForSelector("#imp-apply", { timeout: 30000 }).catch(() => {});
+  const corps = await txt(p, "main");
+  t(!!(await p.$("#imp-apply")) && corps.includes("13,80"), "contrat reconnu : cases proposées dans Contrat");
+  t(
+    !(await p.$("#f-taux")).boundingBox || !(await (await p.$("#f-taux")).boundingBox()),
+    "formulaire replié tant qu'on ne l'a pas demandé",
+  );
+  await wait(500);
+  await p.screenshot({ path: `${OUT}/0-accueil-contrat-reconnu.png` });
   await p.close();
 }
 

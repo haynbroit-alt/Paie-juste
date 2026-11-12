@@ -36,6 +36,10 @@ Les cases sont souvent écrites une par une, dans le désordre (colonne par colo
 - Totaux : le montant est le premier nombre après le mot-clé (« Net à payer » ≠ total employeur).
 - Sans contrat, l'intérim se devine (convention, 7820Z, « fin de mission ») : sinon l'IFM n'est pas contrôlée.
 
+## Reconnaître le document
+
+`devinerDocument` (`js/document-type.js`) pèse des mots-clés (« net à payer », « contrat de mission »…). Un nouveau modèle mal reconnu : ajouter un mot-clé et un cas dans la section 30 de `tests/run.mjs`. En cas de doute, renvoyer `null` : l'appli demande.
+
 ## Formats de nombres à gérer
 
 `1 823,07` · `1.823,07` · `1823,07` · `1823.07` · espaces insécables · taux à 4 décimales (`12,0200`) · montants négatifs (retenues).

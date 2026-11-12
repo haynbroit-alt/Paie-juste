@@ -2,8 +2,15 @@ import { TYPES, MOTIFS_FIN, DEFAULT_RULES, fmtEur, tauxHoraire } from "../calc.j
 import { parseContrat } from "../contrat-parse.js";
 import { esc, fmtParis, parisLocalToIso } from "../util.js";
 import { contratSelect, bindContratSelect } from "./pointer.js";
+import { boutonDocument, brancherDocument, recevoir } from "./document.js";
 
-const ui = { editing: null, draft: null, proposals: null, rawText: "", progress: null, error: "" };
+const ui = { editing: null, draft: null, proposals: null, rawText: "", progress: null, error: "", manuel: false };
+
+/** Accueil « Remplir mon contrat à la main » : le formulaire s'ouvre directement. */
+export function contratALaMain(ctx) {
+  ui.manuel = true;
+  ctx.go("contrat");
+}
 const FIELDS = {
   type: "Type de contrat",
   mode: "Salaire",
@@ -57,6 +64,12 @@ function draftFrom(c) {
 
 const pctIn = (id, label, val, def, art) =>
   `<div><label for="${id}">${label} <span class="hint">(${art})</span></label><input id="${id}" type="number" inputmode="decimal" step="0.1" value="${Math.round((val ?? def) * 1000) / 10}"></div>`;
+
+/** Nouveau contrat vide : le long formulaire reste replié tant qu'on ne le demande pas. */
+function formOuvert() {
+  const d = ui.draft || {};
+  return ui.manuel || ui.editing !== "new" || !!(d.employeur || d.taux || d.mensuel || d.dateDebut);
+}
 
 function formHtml(d) {
   const partiel = Number(d.hebdo) < 35;
@@ -141,44 +154,25 @@ function readForm(el) {
   return d;
 }
 
-async function handleFile(ctx, file) {
-  ui.error = "";
-  ui.proposals = null;
-  ui.progress = { status: "Préparation", progress: 0 };
-  ctx.go("contrat");
-  const prog = (m) => {
-    ui.progress = m;
-    const bar = document.querySelector("#imp-bar");
-    const st = document.querySelector("#imp-st");
-    if (bar) bar.style.width = Math.round((m.progress || 0) * 100) + "%";
-    if (st) st.textContent = m.status || "";
-  };
-  try {
-    const { pdfToText, pdfPageToBlob, imageToText } = await import("../importer.js");
-    let text = "";
-    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-      const r = await pdfToText(file, prog);
-      text = r.text;
-      if (text.replace(/\s/g, "").length < 40) {
-        prog({ status: "PDF scanné : lecture de l'image (OCR)", progress: 0 });
-        text = (await imageToText(await pdfPageToBlob(r.doc, 1), prog)).text;
-      }
-    } else text = (await imageToText(file, prog)).text;
-    ui.rawText = text;
-    ui.proposals = parseContrat(text);
-  } catch (e) {
-    ui.error = "ÉCHEC de lecture : " + (e.message || e) + ". Vous pouvez coller le texte du contrat ci-dessous.";
+recevoir("contrat", (ctx, text) => {
+  if (!ui.editing) {
+    ui.editing = "new";
+    ui.draft = blankDraft();
   }
+  ui.error = "";
   ui.progress = null;
+  ui.rawText = text;
+  ui.proposals = parseContrat(text);
   ctx.go("contrat");
-}
+  window.scrollTo(0, 0);
+  ctx.toast("📝 C'est un contrat : vérifiez ce que j'ai trouvé.");
+});
 
 function importCard() {
   const P = ui.proposals;
-  return `<div class="card"><h3>✨ Ajouter le contrat automatiquement</h3>
-    <p class="small muted">PDF ou photo du contrat. La lecture se fait <b>sur ce téléphone</b> (pdf.js et OCR embarqués) : rien n'est envoyé. Vous validez chaque champ.</p>
-    <label class="btn primary" for="imp-file" style="cursor:pointer">📄 Choisir un PDF ou prendre une photo</label>
-    <input id="imp-file" type="file" accept="application/pdf,image/*" hidden>
+  return `<div class="card"><h3>Le plus simple : votre contrat en photo</h3>
+    <p class="small muted">L'appli remplit les cases, vous vérifiez. Rien ne quitte ce téléphone.</p>
+    ${boutonDocument("imp-file", "📝 Ajouter mon contrat")}
     ${ui.progress ? `<p id="imp-st" class="small">${esc(ui.progress.status || "")}</p><div class="progress"><i id="imp-bar"></i></div><p class="small dim">Première lecture d'une photo : chargement du moteur OCR (≈ 8 Mo, une seule fois).</p>` : ""}
     ${ui.error ? `<p class="note bad">${esc(ui.error)}</p>` : ""}
     <details ${ui.rawText && !P ? "open" : ""}><summary style="min-height:48px;display:flex;align-items:center">ou coller le texte du contrat</summary>
@@ -273,7 +267,14 @@ export default {
         ${c.fin ? "" : `<button class="btn ghost" id="c-new2">＋ Ajouter un autre contrat</button>`}</div>`
           : ""
       }
-      ${ui.editing ? importCard() + formHtml(ui.draft) : ""}
+      ${
+        ui.editing
+          ? importCard() +
+            (formOuvert()
+              ? formHtml(ui.draft)
+              : `<button class="btn" id="c-manuel">✍️ Je n'ai pas le document : remplir à la main</button><div hidden>${formHtml(ui.draft)}</div>`)
+          : ""
+      }
       ${rulesCard()}`;
     bindContratSelect(ctx, el);
     const on = (id, f) => {
@@ -306,11 +307,14 @@ export default {
         };
       }
     });
-    const fi = el.querySelector("#imp-file");
-    if (fi) fi.onchange = () => fi.files[0] && handleFile(ctx, fi.files[0]);
+    brancherDocument(ctx, el, "imp-file", "contrat");
     on("#imp-parse", () => {
       ui.rawText = el.querySelector("#imp-text").value;
       ui.proposals = parseContrat(ui.rawText);
+      ctx.go("contrat");
+    });
+    on("#c-manuel", () => {
+      ui.manuel = true;
       ctx.go("contrat");
     });
     on("#imp-apply", () => {

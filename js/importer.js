@@ -105,3 +105,29 @@ export async function imageToText(blob, onProgress = () => {}) {
     await worker.terminate();
   }
 }
+
+/**
+ * Lit un ou plusieurs fichiers (PDF ou photos, plusieurs pages possibles) et renvoie tout le texte.
+ * PDF scanné (sans texte) : chaque page passe à l'OCR, jusqu'à 6 pages.
+ * @param {File[]} files
+ * @param {(m: {status: string, progress: number}) => void} [onProgress]
+ */
+export async function lireFichiers(files, onProgress = () => {}) {
+  const parts = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const n = files.length > 1 ? ` (${i + 1}/${files.length})` : "";
+    const prog = (m) => onProgress({ status: (m.status || "") + n, progress: m.progress || 0 });
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+      const r = await pdfToText(f, prog);
+      if (r.text.replace(/\s/g, "").length >= 40) parts.push(r.text);
+      else {
+        for (let p = 1; p <= Math.min(r.pages, 6); p++) {
+          prog({ status: `PDF scanné : lecture de la page ${p}`, progress: 0 });
+          parts.push((await imageToText(await pdfPageToBlob(r.doc, p), prog)).text);
+        }
+      }
+    } else parts.push((await imageToText(f, prog)).text);
+  }
+  return parts.join("\n");
+}

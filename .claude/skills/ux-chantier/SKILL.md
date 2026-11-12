@@ -14,6 +14,7 @@ La personne note ses heures en fin de journée, fatiguée, parfois avec des gant
 - **« Comme d'habitude » en un geste** quand des horaires habituels existent.
 - **Heures en 24 h** avec des listes (heure, minutes de 5 en 5), jamais le sélecteur natif (AM/PM selon le téléphone). Jours en français (« Aujourd'hui », « Hier »).
 - **Look clair et simple** : fond blanc, texte foncé, jaune réservé aux boutons principaux (`--jaune`) ; `--amber` foncé pour le texte.
+- **Un seul bouton pour les papiers** : `boutonDocument()` (`js/modules/document.js`), photo ou PDF, plusieurs pages. L'appli devine fiche de paie ou contrat (`js/document-type.js`) et demande en cas de doute. Ne pas recréer de bouton d'import séparé.
 - **Ma paie** commence par « En bref » : heures, heures sup, brut, net à recevoir, état du bulletin.
 
 ## Règles de conception
