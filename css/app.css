@@ -1402,3 +1402,20 @@ ul.verifs .ic {
 .resume td.num {
   width: 1%;
 }
+.demo-banner {
+  position: relative;
+}
+.demo-quit {
+  display: block;
+  margin: 0.35rem auto 0.1rem;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 2px solid #16130d;
+  border-radius: 99px;
+  background: #fff;
+  color: #16130d;
+  font: inherit;
+  font-weight: 900;
+  letter-spacing: 0;
+  cursor: pointer;
+}

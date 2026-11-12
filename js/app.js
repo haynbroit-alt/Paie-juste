@@ -137,6 +137,11 @@ function render() {
 }
 
 $("#btn-data").onclick = () => ctx.go("donnees");
+$("#quit-demo").onclick = async () => {
+  await ctx.setDemo(false);
+  ctx.go("pointer");
+  ctx.toast("Exemple fermé : vous êtes sur vos vraies données.");
+};
 const params = new URLSearchParams(location.search);
 const startDemo = params.get("exemple") === "1" || localStorage.getItem("pj-mode") === "demo";
 if (params.get("onglet")) ctx.view = params.get("onglet");

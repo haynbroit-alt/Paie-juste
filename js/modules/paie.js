@@ -543,6 +543,13 @@ export default {
       </section>
       <section data-panel="fiche" ${panneau === "fiche" ? "" : "hidden"}>
       ${verif}
+      ${
+        P.bulletin && P.bulletin.id
+          ? `<div class="card" id="b-garde"><h3>Fiche de paie gardée · ${esc(fmtMois(periode === "contrat" ? cur : periode))}</h3>
+        <p class="small muted">Ce n'est pas la bonne ? Supprimez-la. Elle reste tracée dans l'historique (rien ne s'efface en cachette).</p>
+        <button class="btn" id="b-suppr">🗑️ Supprimer cette fiche de paie</button></div>`
+          : ""
+      }
       ${bulletinCard(P)}
       </section>
       <section data-panel="details" ${panneau === "details" ? "" : "hidden"}>
@@ -614,6 +621,21 @@ export default {
       ctx.go("paie");
     };
     bindVerif(ctx, el, c, periode === "contrat" ? cur : periode);
+    const bs = el.querySelector("#b-suppr");
+    if (bs) {
+      bs.onclick = async () => {
+        const motif = prompt("Pourquoi supprimer cette fiche ? (gardé dans l'historique)", "Mauvaise fiche de paie");
+        if (motif === null) return;
+        await ctx.append("correction", {
+          targetId: P.bulletin.id,
+          annule: true,
+          motif: motif.trim() || "Fiche supprimée",
+        });
+        ui.panneau = "fiche";
+        ctx.toast("Fiche de paie supprimée. Vous pouvez en ajouter une autre.");
+        ctx.refresh();
+      };
+    }
     el.querySelector("#b-save").onclick = async () => {
       const data = { contratId: c.id, periode };
       el.querySelectorAll('[id^="b-"]').forEach((i) => {

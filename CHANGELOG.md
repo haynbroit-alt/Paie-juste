@@ -9,6 +9,8 @@ Ma paie en 3 pages courtes, l'exemple qui s'efface tout seul, et les montants co
 - Le mode exemple se ferme tout seul dès qu'on met un vrai document (photo ou PDF) : la fiche est vérifiée avec vos vraies données.
 - « ✏️ Un montant est faux ? Corriger » : chaque montant lu sur la fiche est modifiable. « 🔄 Recalculer » refait la vérification, et le montant reste marqué « corrigé par vous ».
 - Mois en cours sans fiche : la prévision du net s'affiche dans Résultat.
+- Bouton « ✖ Quitter l'exemple » dans le bandeau jaune, toujours visible : un geste pour revenir à ses vraies données.
+- « 🗑️ Supprimer cette fiche de paie » (onglet Ma fiche) : une fiche gardée par erreur s'enlève. La suppression reste tracée (correction scellée avec motif), rien ne s'efface en cachette.
 - Les montants ne se coupent plus sur deux lignes. Vérifié sans débordement à 390 px, avec deux polices différentes.
 
 ## 0.8.1 — 2026-11-12

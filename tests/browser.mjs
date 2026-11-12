@@ -443,6 +443,33 @@ console.log("=== Exemple fermé tout seul, montant corrigé à la main ===");
   await p.close();
 }
 
+console.log("=== Sortir de l'exemple, supprimer une fiche de paie ===");
+{
+  const p = await newPage();
+  p.on("dialog", (d) => d.accept("Mauvaise fiche"));
+  await p.goto(BASE + "?nosw&exemple=1&onglet=paie", { waitUntil: "networkidle0" });
+  await wait(600);
+  t((await txt(p, "main")).includes("vous doit"), "exemple : une fiche de paie fictive gardée");
+  await click(p, '[data-p="fiche"]');
+  t(!!(await p.$("#b-suppr")), "Ma fiche : bouton « Supprimer cette fiche de paie »");
+  await click(p, "#b-suppr");
+  await wait(800);
+  await click(p, '[data-p="resultat"]');
+  const m = await txt(p, "main");
+  t(!m.includes("vous doit") && !(await p.$("#b-suppr")), "fiche supprimée : plus de « vous doit »");
+  const hist = await p.evaluate(
+    async () => (await window.__pj.store.all()).filter((r) => r.type === "correction").length,
+  );
+  t(hist >= 1, "suppression tracée (correction scellée, rien d'effacé)");
+  const btn = await p.$("#quit-demo");
+  t(!!btn && !!(await btn.boundingBox()), "bandeau exemple : bouton « Quitter l'exemple » visible");
+  await click(p, "#quit-demo");
+  await wait(800);
+  t(!(await p.$eval("body", (b) => b.classList.contains("demo"))), "un geste : exemple quitté");
+  t(!(await (await p.$("#quit-demo")).boundingBox()), "hors exemple : le bouton disparaît");
+  await p.close();
+}
+
 console.log("=== Fiche de paie sans contrat : tout automatique ===");
 {
   const p = await newPage();
