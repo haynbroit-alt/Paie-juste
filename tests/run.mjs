@@ -24,6 +24,7 @@ import { computePeriod } from "../js/compute.js";
 import { sealRecord, verifyChain, GENESIS_HASH } from "../js/chain.js";
 import { parseContrat } from "../js/contrat-parse.js";
 import { parseBulletin } from "../js/bulletin-parse.js";
+import { devinerDocument } from "../js/document-type.js";
 import { itemsToLines } from "../js/importer.js";
 import { chiffrer, dechiffrer, estSauvegardeChiffree, codeValide, META_KEYS, ITERATIONS } from "../js/sauvegarde.js";
 import { lettreAmiable, miseEnDemeure, demandeAccesRgpd } from "../js/letters.js";
@@ -734,6 +735,40 @@ console.log("=== 29. Bulletin d'agence d'intérim : colonne calendrier, page en 
   const fr = cmpF.lines.find((l) => l.key === "frais");
   t(fr.recu === 306.21 && fr.ecart === null, "frais non saisis : montant lu affiché, pas d'écart");
   t(cmpF.lines.find((l) => l.key === "base").ecart === 0, "salaire de base toujours comparé");
+}
+
+console.log("=== 30. Un seul bouton : fiche de paie ou contrat, deviné tout seul ===");
+{
+  const fiche = [
+    "BULLETIN DE PAYE",
+    "Période de paye du 02/03/2026 au 27/03/2026",
+    "Contrat 99999 MACON (N2P1) . 02/03/2026 27/03/2026",
+    "Qualification : maçon",
+    "Hrs normales 135,000 14,000 1 890,00",
+    "Total Brut total * 2 074,70",
+    "Sécurité sociale plafonnée 2 074,700 6,900 -143,15",
+    "Net à payer 1808,00 Eur",
+  ].join("\n");
+  t(devinerDocument(fiche).type === "bulletin", "fiche de paie reconnue (même avec « Contrat » et « Qualification »)");
+  const mission = [
+    "CONTRAT DE MISSION — EXEMPLE",
+    "Entreprise de travail temporaire : Intérim Exemple Sud",
+    "Entreprise utilisatrice : Bâtiment Exemple SARL",
+    "Qualification : Coffreur bancheur",
+    "Du 02/11/2026 au 27/11/2026",
+    "Durée hebdomadaire : 39 heures par semaine",
+    "Rémunération : 13,80 € brut de l'heure",
+  ].join("\n");
+  t(devinerDocument(mission).type === "contrat", "contrat de mission reconnu");
+  t(
+    devinerDocument("CONTRAT A DUREE DETERMINEE\nEntre les soussignés\nPériode d'essai : 2 semaines").type ===
+      "contrat",
+    "CDD reconnu (sans accents, majuscules)",
+  );
+  t(devinerDocument("Liste de courses : pain, lait").type === null, "autre document : pas de devinette");
+  t(devinerDocument("").type === null && devinerDocument(null).contrat === 0, "texte vide : rien");
+  const flou = devinerDocument("Rémunération brute selon contrat de travail, net à payer");
+  t(flou.type === null, "document ambigu : l'appli demande au lieu de deviner");
 }
 
 runRules(t, eq);

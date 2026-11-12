@@ -19,7 +19,8 @@
     "js/util.js",
     "js/journee.js",
     "js/bulletin-parse.js",
-    "js/sauvegarde.js"
+    "js/sauvegarde.js",
+    "js/document-type.js"
   ],
   "exclude": ["vendor", "node_modules"]
 }

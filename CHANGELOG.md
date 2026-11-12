@@ -1,5 +1,16 @@
 # Journal des changements
 
+## 0.8.0 — 2026-11-12
+
+Un seul bouton pour tous les papiers. Les montants de paie ne changent pas.
+
+- Partout le même gros bouton : « 📄 Ajouter ma fiche de paie ou mon contrat », photo ou PDF, plusieurs pages d'un coup.
+- L'appli reconnaît toute seule le document (règles simples, sans IA) : une fiche de paie va dans Ma paie avec la vérification, un contrat va dans Contrat avec les cases pré-remplies.
+- En cas de doute, elle demande en deux gros boutons : « Ma fiche de paie » ou « Mon contrat ». Photo illisible : elle dit comment la reprendre.
+- Pendant la lecture, un écran « ⏳ Je lis votre document… » avec la progression, en français.
+- PDF scanné : toutes les pages sont lues (jusqu'à 6), plus seulement la première.
+- Accueil : on commence par le document, pas par un formulaire. Contrat : le long formulaire reste replié derrière « Je n'ai pas le document : remplir à la main ».
+
 ## 0.7.3 — 2026-11-11
 
 Le détail de la fiche de paie, ligne par ligne. Les montants de paie ne changent pas.

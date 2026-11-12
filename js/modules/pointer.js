@@ -1,5 +1,7 @@
 import { parisDate, weekKey, fmtH, splitWeekly, sumRows, minutesByDay, workIntervals, TYPES } from "../calc.js";
 import { esc, fmtJour, nowIso, isoToParisLocal, downloadBlob } from "../util.js";
+import { boutonDocument, brancherDocument } from "./document.js";
+import { contratALaMain } from "./contrat.js";
 import {
   journeePunches,
   motifJournee,
@@ -273,9 +275,11 @@ export default {
   render(ctx, el) {
     const c = ctx.state.contrats.get(ctx.meta.currentContrat);
     if (!c) {
-      el.innerHTML = `<div class="card"><h2>Bienvenue, chef 👷</h2><p>Je travaille, je note mes heures, Paie Juste vérifie ma paie. <b>Tout reste sur ce téléphone.</b></p>
-        <button class="btn primary" id="go-c">📷 Ajouter mon contrat (photo ou à la main)</button><button class="btn" id="go-demo">Voir l'exemple (données fictives)</button></div>`;
-      el.querySelector("#go-c").onclick = () => ctx.go("contrat");
+      el.innerHTML = `<div class="card"><h2>Bienvenue, chef 👷</h2><p>Prenez en photo votre fiche de paie ou votre contrat : l'appli lit, vérifie et vous dit s'il manque de l'argent. <b>Tout reste sur ce téléphone.</b></p>
+        ${boutonDocument("w-file")}
+        <button class="btn" id="go-c">✍️ Remplir mon contrat à la main</button><button class="btn ghost" id="go-demo">Voir un exemple</button></div>`;
+      brancherDocument(ctx, el, "w-file");
+      el.querySelector("#go-c").onclick = () => contratALaMain(ctx);
       el.querySelector("#go-demo").onclick = () => ctx.setDemo(true);
       return;
     }
