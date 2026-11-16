@@ -1,0 +1,66 @@
+/* Page d'information statique (référencement). Aucune dépendance externe. */
+body {
+  margin: 0;
+  background: #f4f3ef;
+  color: #16130d;
+  font:
+    18px/1.6 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 18px 48px;
+}
+h1 {
+  font-size: 1.8rem;
+  line-height: 1.25;
+}
+h2 {
+  margin-top: 2rem;
+  font-size: 1.3rem;
+}
+a {
+  color: #1f6b3c;
+}
+.cta {
+  display: inline-block;
+  margin: 8px 0 16px;
+  padding: 14px 22px;
+  border-radius: 14px;
+  background: #ffc82e;
+  color: #16130d;
+  font-weight: 700;
+  text-decoration: none;
+}
+.note {
+  padding: 12px 14px;
+  border-left: 4px solid #7a211d;
+  background: #fff;
+}
+.shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.shots figure {
+  flex: 1 1 200px;
+  margin: 0;
+}
+.shots img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+}
+figcaption {
+  font-size: 0.85rem;
+}
+footer {
+  margin-top: 40px;
+  font-size: 0.85rem;
+  color: #555;
+}
