@@ -3,7 +3,7 @@
 > **Changement de périmètre (10/11/2026, 10 h 34, heure de Paris) :** l'appli s'adresse à **tous les salariés du privé** (CDI, CDD, intérim, temps partiel), et plus seulement aux intérimaires. Nom proposé : **Paie Juste** (« pointer · vérifier · réclamer »). Les règles intérim ci-dessous restent valables ; les sections 1 bis et 1 ter ajoutent les autres contrats et le passage du brut au net.
 
 **Vérifié le :** mardi 10 novembre 2026 (heure de Paris).
-**Pour :** Lhassan Charfa (Montpellier) et tout salarié du privé.
+**Pour :** tout salarié du privé.
 **Méthode :** j'ai ouvert chaque texte pendant cette session. Les copies brutes sont dans `interim/sources/`.
 Les articles viennent du **Code du travail numérique** (code.travail.gouv.fr, site du ministère du Travail, qui reprend le texte de Légifrance), et les fiches de **service-public.gouv.fr**.
 **Étiquettes :** PROUVÉ = lu sur une source officielle et codé ; INCONNU = non vérifié sur une source officielle, donc **rien n'est codé en dur** et l'utilisateur saisit la valeur ; CONFLIT = des sources se contredisent ; ÉCHEC = je n'ai pas pu ouvrir la source.

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://paie-juste.netlify.app/sitemap.xml

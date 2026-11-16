@@ -1,5 +1,13 @@
 # Journal des changements
 
+## 0.9.1 — 2026-11-16
+
+On trouve Paie Juste plus clairement dans une recherche, et une page explique comment vérifier sa fiche. Les montants de paie ne changent pas.
+
+- Le titre et la description disent à quoi sert l'appli. Un aperçu (image, titre) est prêt pour un partage.
+- Page « Vérifier sa fiche de paie » : heures, bulletin, réclamation, questions fréquentes, bouton pour ouvrir l'appli.
+- Fichiers pour les moteurs de recherche : robots.txt, plan du site, clé IndexNow.
+
 ## 0.9.0 — 2026-11-12
 
 Ma paie en 3 pages courtes, l'exemple qui s'efface tout seul, et les montants corrigeables. Les règles de calcul ne changent pas.
