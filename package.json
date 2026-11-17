@@ -20,7 +20,7 @@
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "modele-social": "11.1.0",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.1",
     "publicodes": "1.10.4",
     "puppeteer-core": "^25.16.0",
     "typescript": "^7.0.2"
