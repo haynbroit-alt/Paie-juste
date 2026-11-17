@@ -22,7 +22,7 @@
     "modele-social": "11.1.0",
     "prettier": "^3.9.10",
     "publicodes": "1.10.4",
-    "puppeteer-core": "^25.16.0",
+    "puppeteer-core": "^25.17.0",
     "typescript": "^7.0.2"
   }
 }
